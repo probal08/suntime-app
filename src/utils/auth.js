@@ -1,0 +1,256 @@
+import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as Crypto from 'expo-crypto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Storage Keys
+const KEYS = {
+    AUTH_USERNAME: 'auth_username',
+    AUTH_PASSWORD: 'auth_password',
+    AUTH_BIOMETRIC_ENABLED: 'auth_biometric_enabled',
+    LOGGED_OUT: 'logged_out', // Simple flag for logout state
+};
+
+/**
+ * Secure storage for mobile (uses SecureStore)
+ */
+const secureStorage = {
+    setItem: async (key, value) => {
+        return SecureStore.setItemAsync(key, value);
+    },
+    getItem: async (key) => {
+        return SecureStore.getItemAsync(key);
+    },
+    deleteItem: async (key) => {
+        return SecureStore.deleteItemAsync(key);
+    },
+};
+
+/**
+ * Hash password using SHA256
+ */
+export const hashPassword = async (password) => {
+    try {
+        const hash = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            password
+        );
+        return hash;
+    } catch (error) {
+        console.error('Error hashing password:', error);
+        throw error;
+    }
+};
+
+/**
+ * Save user credentials
+ */
+export const saveCredentials = async (username, password, enableBiometric = false) => {
+    try {
+        const hashedPassword = await hashPassword(password);
+
+        await secureStorage.setItem(KEYS.AUTH_USERNAME, username);
+        await secureStorage.setItem(KEYS.AUTH_PASSWORD, hashedPassword);
+        await secureStorage.setItem(KEYS.AUTH_BIOMETRIC_ENABLED, enableBiometric.toString());
+
+        // Clear logged out flag when registering
+        await AsyncStorage.removeItem(KEYS.LOGGED_OUT);
+
+        return true;
+    } catch (error) {
+        console.error('Error saving credentials:', error);
+        throw error;
+    }
+};
+
+/**
+ * Verify password
+ */
+export const verifyPassword = async (password) => {
+    try {
+        const storedHash = await secureStorage.getItem(KEYS.AUTH_PASSWORD);
+        if (!storedHash) {
+            return false;
+        }
+
+        const inputHash = await hashPassword(password);
+        const isValid = inputHash === storedHash;
+
+        if (isValid) {
+            // Clear logged out flag on successful login
+            await AsyncStorage.removeItem(KEYS.LOGGED_OUT);
+        }
+
+        return isValid;
+    } catch (error) {
+        console.error('Error verifying password:', error);
+        return false;
+    }
+};
+
+/**
+ * Get username
+ */
+export const getUsername = async () => {
+    try {
+        return await secureStorage.getItem(KEYS.AUTH_USERNAME);
+    } catch (error) {
+        console.error('Error getting username:', error);
+        return null;
+    }
+};
+
+/**
+ * Check if user is registered
+ */
+export const isUserRegistered = async () => {
+    try {
+        const username = await secureStorage.getItem(KEYS.AUTH_USERNAME);
+        const password = await secureStorage.getItem(KEYS.AUTH_PASSWORD);
+        return !!(username && password);
+    } catch (error) {
+        console.error('Error checking registration:', error);
+        return false;
+    }
+};
+
+/**
+ * Check if user is logged OUT
+ */
+export const isLoggedOut = async () => {
+    try {
+        const loggedOut = await AsyncStorage.getItem(KEYS.LOGGED_OUT);
+        return loggedOut === 'true';
+    } catch (error) {
+        console.error('Error checking logged out state:', error);
+        return false;
+    }
+};
+
+/**
+ * LOGOUT - Set logged out flag (keeps credentials)
+ */
+export const logout = async () => {
+    try {
+        await AsyncStorage.setItem(KEYS.LOGGED_OUT, 'true');
+        console.log('✅ Logged out (credentials preserved)');
+        return true;
+    } catch (error) {
+        console.error('Error logging out:', error);
+        return false;
+    }
+};
+
+/**
+ * DELETE ACCOUNT - Remove credentials completely
+ */
+export const deleteAccount = async () => {
+    try {
+        await secureStorage.deleteItem(KEYS.AUTH_USERNAME);
+        await secureStorage.deleteItem(KEYS.AUTH_PASSWORD);
+        await secureStorage.deleteItem(KEYS.AUTH_BIOMETRIC_ENABLED);
+        await AsyncStorage.removeItem(KEYS.LOGGED_OUT);
+        console.log('✅ Account deleted (credentials removed)');
+        return true;
+    } catch (error) {
+        console.error('Error deleting account:', error);
+        return false;
+    }
+};
+
+/**
+ * Biometric Authentication
+ */
+export const checkBiometricAvailable = async () => {
+    try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        return compatible && enrolled;
+    } catch (error) {
+        console.error('Error checking biometric:', error);
+        return false;
+    }
+};
+
+export const isBiometricEnabled = async () => {
+    try {
+        const enabled = await secureStorage.getItem(KEYS.AUTH_BIOMETRIC_ENABLED);
+        return enabled === 'true';
+    } catch (error) {
+        console.error('Error checking biometric status:', error);
+        return false;
+    }
+};
+
+export const setBiometricEnabled = async (enabled) => {
+    try {
+        await secureStorage.setItem(KEYS.AUTH_BIOMETRIC_ENABLED, enabled.toString());
+        return true;
+    } catch (error) {
+        console.error('Error setting biometric status:', error);
+        return false;
+    }
+};
+
+export const authenticateWithBiometric = async () => {
+    try {
+        const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Authenticate to access Suntime',
+            fallbackLabel: 'Use Password',
+        });
+
+        if (result.success) {
+            // Clear logged out flag
+            await AsyncStorage.removeItem(KEYS.LOGGED_OUT);
+        }
+
+        return result.success;
+    } catch (error) {
+        console.error('Biometric authentication error:', error);
+        return false;
+    }
+};
+
+/**
+ * Change password
+ */
+export const changePassword = async (currentPassword, newPassword) => {
+    try {
+        const isValid = await verifyPassword(currentPassword);
+        if (!isValid) {
+            return { success: false, error: 'Current password is incorrect' };
+        }
+
+        const hashedPassword = await hashPassword(newPassword);
+        await secureStorage.setItem(KEYS.AUTH_PASSWORD, hashedPassword);
+        return { success: true };
+    } catch (error) {
+        console.error('Error changing password:', error);
+        return { success: false, error: 'Failed to change password' };
+    }
+};
+
+/**
+ * App Lock Management
+ */
+export const isAppLockEnabled = async () => {
+    try {
+        const enabled = await AsyncStorage.getItem('app_lock_enabled');
+        return enabled === 'true';
+    } catch (error) {
+        console.error('Error checking app lock:', error);
+        return false;
+    }
+};
+
+export const setAppLockEnabled = async (enabled) => {
+    try {
+        if (enabled) {
+            await AsyncStorage.setItem('app_lock_enabled', 'true');
+        } else {
+            await AsyncStorage.removeItem('app_lock_enabled');
+        }
+    } catch (error) {
+        console.error('Error setting app lock:', error);
+    }
+};
