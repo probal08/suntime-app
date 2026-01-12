@@ -3,10 +3,10 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, ZoomIn, FadeInRight } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../constants/theme';
@@ -17,6 +17,7 @@ export default function ProgressScreen() {
     const [weeklyStreak, setWeeklyStreak] = useState(0);
     const [monthlyTotal, setMonthlyTotal] = useState(0);
     const [totalSessions, setTotalSessions] = useState(0);
+    const [averagePerDay, setAveragePerDay] = useState(0);
 
     useEffect(() => {
         loadProgress();
@@ -73,6 +74,17 @@ export default function ProgressScreen() {
             });
             const monthMins = monthSessions.reduce((sum, log) => sum + log.duration, 0);
             setMonthlyTotal(monthMins);
+
+            // Calculate average per day (total minutes / number of days with sessions)
+            const uniqueDays = new Set();
+            logs.forEach(log => {
+                const logDate = new Date(log.date);
+                const dayKey = `${logDate.getFullYear()}-${logDate.getMonth()}-${logDate.getDate()}`;
+                uniqueDays.add(dayKey);
+            });
+            const totalMinutes = logs.reduce((sum, log) => sum + log.duration, 0);
+            const avgPerDay = uniqueDays.size > 0 ? Math.round(totalMinutes / uniqueDays.size) : 0;
+            setAveragePerDay(avgPerDay);
 
             // Total sessions
             setTotalSessions(logs.length);
@@ -160,7 +172,7 @@ export default function ProgressScreen() {
                     <View style={styles.statRow}>
                         <Text style={styles.statRowLabel}>Average per Day</Text>
                         <Text style={styles.statRowValue}>
-                            {totalSessions > 0 ? Math.round(todayMinutes) : 0} min
+                            {averagePerDay} min
                         </Text>
                     </View>
                 </View>

@@ -5,12 +5,13 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
-    SafeAreaView,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
     InteractionManager,
+    Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
     FadeIn,
     FadeInDown,

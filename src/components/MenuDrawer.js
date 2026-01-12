@@ -66,10 +66,9 @@ export default function MenuDrawer({
     profileImage,
     onLogout
 }) {
+    const elementWidth = DRAWER_WIDTH;
     const opacity = useSharedValue(0);
     const translateX = useSharedValue(-elementWidth);
-
-    const elementWidth = DRAWER_WIDTH;
 
     useEffect(() => {
         if (isVisible) {

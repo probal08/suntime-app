@@ -242,7 +242,8 @@ const styles = StyleSheet.create({
         ...SHADOWS.small,
     },
     username: {
-        ...TYPOGRAPHY.h2,
+        ...TYPOGRAPHY.heading,
+        fontSize: moderateScale(24),
         color: COLORS.text,
         marginBottom: SPACING.xs,
     },

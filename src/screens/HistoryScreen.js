@@ -3,11 +3,11 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     Dimensions,
     Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight, ZoomIn } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { BarChart } from 'react-native-chart-kit';
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: SPACING.lg,
-        paddingBottom: SPACING.xxl,
+        paddingBottom: moderateScale(100),
     },
     title: {
         ...TYPOGRAPHY.title,

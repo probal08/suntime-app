@@ -1,3 +1,4 @@
+import { registerRootComponent } from 'expo';
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { LogBox, View, Text } from 'react-native';
@@ -23,7 +24,7 @@ LogBox.ignoreLogs([
     'Non-serializable values were found in the navigation state',
 ]);
 
-export default function App() {
+function App() {
     useEffect(() => {
         // Force hide splash screen after 2 seconds to be sure
         setTimeout(async () => {
@@ -61,3 +62,6 @@ export default function App() {
         </GestureHandlerRootView>
     );
 }
+
+export default App;
+registerRootComponent(App);

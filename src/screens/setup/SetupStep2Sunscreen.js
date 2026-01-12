@@ -26,8 +26,8 @@ export default function SetupStep2Sunscreen({ navigation }) {
         try {
             // Save default preference
             await saveDefaultPreferences({
-                defaultSunscreen: useSunscreen,
-                defaultCloudy: false
+                sunscreen: useSunscreen,
+                cloudy: false
             });
 
             // Navigate to next step

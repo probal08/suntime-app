@@ -55,7 +55,12 @@ export const getSessionLogs = async () => {
 export const addSessionLog = async (session) => {
     try {
         const logs = await getSessionLogs();
-        logs.unshift(session);
+        // Ensure session has an ID
+        const sessionWithId = {
+            ...session,
+            id: session.id || Date.now().toString() + Math.random().toString(36).substr(2, 9)
+        };
+        logs.unshift(sessionWithId);
         // Keep only last 30 days
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -200,10 +205,10 @@ export const completeSetup = async () => {
  */
 export const saveDefaultPreferences = async (preferences) => {
     try {
-        const { defaultSunscreen, defaultCloudy } = preferences;
+        const { sunscreen, cloudy } = preferences;
         await AsyncStorage.setItem('default_preferences', JSON.stringify({
-            sunscreen: defaultSunscreen || false,
-            cloudy: defaultCloudy || false,
+            sunscreen: sunscreen !== undefined ? sunscreen : false,
+            cloudy: cloudy !== undefined ? cloudy : false,
         }));
         return true;
     } catch (error) {

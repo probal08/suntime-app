@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
     ActivityIndicator,
     Alert,
     ScrollView,
@@ -13,6 +12,7 @@ import {
     ToastAndroid,
     Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
@@ -317,7 +317,7 @@ export default function HomeScreen() {
         );
     }
 
-    const uvCategory = getUVCategory(uvIndex);
+    const uvCategory = getUVCategory(uvIndex || 0);
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
     const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -373,7 +373,7 @@ export default function HomeScreen() {
                     <Animated.View style={[styles.uvInfo, animatedUVStyle]}>
                         <Text style={styles.uvLabel}>UV Index</Text>
                         <Text style={[styles.uvValue, { color: uvCategory.color }]}>
-                            {uvIndex.toFixed(1)}
+                            {(uvIndex || 0).toFixed(1)}
                         </Text>
                         <Text style={[styles.uvLevel, { color: uvCategory.color }]}>
                             {uvCategory.level}
