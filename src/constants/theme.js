@@ -10,49 +10,105 @@ export const scale = (size) => (SCREEN_WIDTH / guidelineBaseWidth) * size;
 export const verticalScale = (size) => (SCREEN_HEIGHT / guidelineBaseHeight) * size;
 export const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
-export const COLORS = {
-  // Grayscale Palette
-  primary: '#000000',           // Pure Black
-  primaryLight: '#333333',
-  primaryDark: '#000000',
+// Palette Definitions
+export const LightColors = {
+  primary: '#FF6D00',           // Deep Orange
+  primaryLight: '#FFE0B2',
+  primaryDark: '#E65100',
 
-  // Secondary Palette (Kept as darker gray)
   secondary: '#222222',
   secondaryLight: '#444444',
 
-  // Background Colors
   background: '#FFFFFF',        // Pure White
-  backgroundLight: '#F9F9F9',   // Very light gray for contrast
+  backgroundLight: '#F9F9F9',
   cardBackground: '#FFFFFF',
 
-  // Text Colors
-  text: '#000000',              // Pure Black for text
-  textSecondary: '#444444',     // Dark gray for subtext
-  textLight: '#777777',         // Medium gray
+  text: '#000000',
+  textSecondary: '#444444',
+  textLight: '#777777',
 
-  // Functional Colors (High Contrast)
-  success: '#000000',           // Using black for success in B&W theme
+  success: '#000000',
   successLight: '#333333',
-  danger: '#000000',            // Using black for danger (minimalist)
+  danger: '#000000',
   dangerLight: '#333333',
-  warning: '#000000',           // Using black for warning
+  warning: '#000000',
   warningLight: '#333333',
 
-  // UI Elements
   white: '#FFFFFF',
   gray: '#777777',
   lightGray: '#EEEEEE',
   border: '#E0E0E0',
 };
 
+export const DarkColors = {
+  primary: '#FFB74D',           // Lighter Orange for Dark Mode
+  primaryLight: '#FFCC80',
+  primaryDark: '#F57C00',
+
+  secondary: '#DDDDDD',
+  secondaryLight: '#BBBBBB',
+
+  background: '#121212',        // Deep Black/Gray
+  backgroundLight: '#1E1E1E',
+  cardBackground: '#2C2C2C',    // Lighter than background for card separation
+
+  text: '#FFFFFF',              // White Text
+  textSecondary: '#CCCCCC',     // Lighter Gray for subtext
+  textLight: '#AAAAAA',
+
+  success: '#81C784',           // Light Green
+  successLight: '#1B5E20',
+  danger: '#E57373',            // Light Red
+  dangerLight: '#CCCCCC',
+  warning: '#FFFFFF',
+  warningLight: '#CCCCCC',
+
+  white: '#000000',             // Inverted 'white' logic or keep strict colors? 
+  // Better to keep 'white' as #FFFFFF for absolute values, but mapped functional colors.
+  // Strategies: using semantic names is better.
+  // For now, we allow specific overrides.
+
+  // Specific absolutes if needed
+  trueWhite: '#FFFFFF',
+  trueBlack: '#000000',
+
+  gray: '#999999',
+  lightGray: '#333333',
+  border: '#333333',
+};
+
+// Default export for backward compatibility
+export const COLORS = LightColors;
+
 // Gradient Definitions (Minimalist Grayscale)
+// Gradient Definitions (Premium)
 export const GRADIENTS = {
-  sunrise: ['#000000', '#444444'],
-  sky: ['#222222', '#666666'],
-  warm: ['#333333', '#777777'],
-  success: ['#000000', '#333333'],
-  danger: ['#000000', '#333333'],
-  soft: ['#FFFFFF', '#F9F9F9'],
+  sunrise: ['#FF6D00', '#FFAB40'], // Orange to Gold
+  sky: ['#4FC3F7', '#2196F3'],     // Light Blue to Blue
+  night: ['#2c3e50', '#000000'],   // Midnight Blue to Black
+  sunset: ['#FF512F', '#DD2476'],  // Red-Orange to Pink (Vibrant)
+  ocean: ['#2193b0', '#6dd5ed'],   // Blue-Green
+  primary: ['#FF6D00', '#F57C00'], // Main Orange Gradient
+  darkCard: ['#2C2C2C', '#1E1E1E'], // Subtle dark gradient
+};
+
+// Glassmorphism Constants
+export const GLASS = {
+  default: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderWidth: 1,
+  },
+  dark: {
+    backgroundColor: 'rgba(30, 30, 30, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+  },
+  frost: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+  },
 };
 
 export const SPACING = {

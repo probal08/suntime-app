@@ -12,13 +12,29 @@ import {
 import Animated, { FadeInDown, FadeInRight, ZoomIn } from 'react-native-reanimated';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../constants/theme';
 import { Sun } from 'lucide-react-native';
-import { setOnboarded } from '../utils/storage';
+import { setOnboarded, getUserSettings } from '../utils/storage';
 import { getSkinTypeDescription } from '../utils/sunLogic';
+
+import { useTheme } from '../context/ThemeContext';
 
 const SKIN_TYPES = [1, 2, 3, 4, 5, 6];
 
 export default function OnboardingScreen({ navigation, route }) {
+    const { colors } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors), [colors]);
     const [selectedType, setSelectedType] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    // Initial load to pre-select skin type if editing
+    React.useEffect(() => {
+        const loadCurrent = async () => {
+            const settings = await getUserSettings();
+            if (settings && settings.skinType) {
+                setSelectedType(settings.skinType);
+            }
+        };
+        loadCurrent();
+    }, []);
 
     const handleContinue = async () => {
         if (selectedType === null) {
@@ -27,10 +43,11 @@ export default function OnboardingScreen({ navigation, route }) {
         }
 
         try {
+            setLoading(true);
             await setOnboarded(selectedType);
 
-            // Check if this is a modal (from Settings) or initial onboarding
-            const isModal = navigation.getState().routes.some(r => r.name === 'ChangeSkinType');
+            // Check if this is a modal (from Settings)
+            const isModal = route.name === 'ChangeSkinType';
 
             if (isModal) {
                 // Just go back to Settings
@@ -46,11 +63,12 @@ export default function OnboardingScreen({ navigation, route }) {
         } catch (error) {
             console.error('Error saving onboarding data:', error);
             Alert.alert('Error', 'Error saving your data. Please try again.');
+            setLoading(false);
         }
     };
 
     const getSkinColor = (type) => {
-        const colors = {
+        const skinColors = {
             1: '#FFE0BD',
             2: '#F1C27D',
             3: '#C68642',
@@ -58,16 +76,20 @@ export default function OnboardingScreen({ navigation, route }) {
             5: '#6B4423',
             6: '#3D2817',
         };
-        return colors[type] || '#9E9E9E';
+        return skinColors[type] || '#9E9E9E';
     };
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <Animated.View
+                    entering={FadeInDown.delay(200)}
                     style={styles.header}
                 >
-                    <Sun color={COLORS.primary} size={moderateScale(72)} style={{ marginBottom: SPACING.lg }} />
+                    <Sun color={colors.primary} size={moderateScale(72)} style={{ marginBottom: SPACING.lg }} />
                     <Text style={styles.title}>Welcome to Suntime</Text>
                     <Text style={styles.subtitle}>
                         Calculate safe sun exposure to maximize Vitamin D without burning
@@ -75,14 +97,16 @@ export default function OnboardingScreen({ navigation, route }) {
                 </Animated.View>
 
                 <Animated.View
+                    entering={FadeInDown.delay(400)}
                     style={styles.section}
                 >
                     <Text style={styles.sectionTitle}>Select Your Skin Type</Text>
                     <Text style={styles.sectionSubtitle}>Based on the Fitzpatrick Scale</Text>
 
                     {SKIN_TYPES.map((type, index) => (
-                        <Animated.View
+                        <View
                             key={type}
+                            style={{ marginBottom: 10 }}
                         >
                             <TouchableOpacity
                                 style={[
@@ -90,6 +114,7 @@ export default function OnboardingScreen({ navigation, route }) {
                                     selectedType === type && styles.skinTypeCardSelected,
                                 ]}
                                 onPress={() => setSelectedType(type)}
+                                activeOpacity={0.7}
                             >
                                 <View style={styles.skinTypeHeader}>
                                     <View
@@ -107,52 +132,53 @@ export default function OnboardingScreen({ navigation, route }) {
                                     {getSkinTypeDescription(type).split(' - ')[1]}
                                 </Text>
                             </TouchableOpacity>
-                        </Animated.View>
+                        </View>
                     ))}
                 </Animated.View>
 
                 <TouchableOpacity
                     style={[
                         styles.continueButton,
-                        selectedType === null && styles.continueButtonDisabled,
+                        (selectedType === null || loading) && styles.continueButtonDisabled,
                     ]}
                     onPress={handleContinue}
-                    disabled={selectedType === null}
+                    disabled={selectedType === null || loading}
                 >
-                    <Text style={styles.continueButtonText}>Continue</Text>
+                    <Text style={styles.continueButtonText}>
+                        {loading ? 'Saving...' : 'Continue'}
+                    </Text>
                 </TouchableOpacity>
+                <View style={{ height: 40 }} />
             </ScrollView>
         </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
-        paddingBottom: SPACING.xxl,
+        paddingBottom: SPACING.xxl * 2, // Added extra padding for scrolling
+        flexGrow: 1,
     },
     header: {
         alignItems: 'center',
         marginBottom: SPACING.xxl,
         paddingTop: SPACING.lg,
     },
-    emoji: {
-        fontSize: moderateScale(72),
-        marginBottom: SPACING.lg,
-    },
     title: {
         ...TYPOGRAPHY.title,
         textAlign: 'center',
         marginBottom: SPACING.sm,
+        color: colors.text, // Dynamic color
     },
     subtitle: {
         ...TYPOGRAPHY.body,
         textAlign: 'center',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         paddingHorizontal: SPACING.lg,
         lineHeight: 24,
     },
@@ -162,25 +188,26 @@ const styles = StyleSheet.create({
     sectionTitle: {
         ...TYPOGRAPHY.heading,
         marginBottom: SPACING.xs,
+        color: colors.text, // Dynamic color
     },
     sectionSubtitle: {
         ...TYPOGRAPHY.caption,
         marginBottom: SPACING.lg,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     skinTypeCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground, // Dynamic color
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.md,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border, // Dynamic color
         ...SHADOWS.small,
     },
     skinTypeCardSelected: {
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
         borderWidth: 3,
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight, // Dynamic color
         ...SHADOWS.medium,
     },
     skinTypeHeader: {
@@ -189,43 +216,47 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.sm,
     },
     skinTypeIndicator: {
-        width: moderateScale(28),
+        width: moderateScale(28), // Ensure visibility
         height: moderateScale(28),
         borderRadius: BORDER_RADIUS.full,
         marginRight: SPACING.md,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     skinTypeTitle: {
         ...TYPOGRAPHY.subheading,
         flex: 1,
         fontWeight: '600',
+        color: colors.text, // Dynamic color
     },
     checkmark: {
         fontSize: 28,
-        color: COLORS.primary,
+        color: colors.primary,
     },
     skinTypeDescription: {
         ...TYPOGRAPHY.caption,
-        marginLeft: 40,
+        marginLeft: 44, // Adjusted for alignment
         lineHeight: 20,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     continueButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.md + 2,
+        padding: SPACING.md + 4, // Bigger touch area
         alignItems: 'center',
         marginTop: SPACING.xl,
+        marginBottom: SPACING.xl,
         ...SHADOWS.button,
     },
     continueButtonDisabled: {
-        backgroundColor: COLORS.lightGray,
+        backgroundColor: colors.disabled || '#A0A0A0',
+        opacity: 0.7,
         ...SHADOWS.small,
     },
     continueButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
-        fontWeight: '600',
+        color: colors.white,
+        fontWeight: 'bold',
+        fontSize: moderateScale(18),
     },
 });

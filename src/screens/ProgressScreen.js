@@ -4,15 +4,40 @@ import {
     Text,
     StyleSheet,
     ScrollView,
+    TouchableOpacity,
     Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, ZoomIn, FadeInRight } from 'react-native-reanimated';
-import { useFocusEffect } from '@react-navigation/native';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../constants/theme';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
+import { SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GRADIENTS, GLASS } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getSessionLogs } from '../utils/storage';
+import { ArrowLeft, MoreVertical } from 'lucide-react-native';
+import MenuDrawer from '../components/MenuDrawer';
+import { getUsername } from '../utils/auth';
+import { getProfileImage } from '../utils/storage';
 
 export default function ProgressScreen() {
+    const navigation = useNavigation();
+    const { colors, isDark } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors), [colors]);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [username, setUsername] = useState('User');
+    const [profileImage, setProfileImage] = useState(null);
+
+    useEffect(() => {
+        loadMenuData();
+    }, []);
+
+    const loadMenuData = async () => {
+        const user = await getUsername();
+        if (user) setUsername(user);
+        const img = await getProfileImage();
+        if (img) setProfileImage(img);
+    };
+
     const [todayMinutes, setTodayMinutes] = useState(0);
     const [weeklyStreak, setWeeklyStreak] = useState(0);
     const [monthlyTotal, setMonthlyTotal] = useState(0);
@@ -97,6 +122,13 @@ export default function ProgressScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <LinearGradient
+                colors={isDark ? GRADIENTS.night : GRADIENTS.sunrise}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                opacity={isDark ? 0.8 : 0.3}
+            />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -106,6 +138,20 @@ export default function ProgressScreen() {
                     entering={FadeInDown}
                     style={styles.header}
                 >
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Home')}
+                            style={styles.backButton}
+                        >
+                            <ArrowLeft color={colors.text} size={24} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setIsMenuOpen(true)}
+                            style={{ padding: SPACING.sm }}
+                        >
+                            <MoreVertical size={moderateScale(24)} color={colors.text} />
+                        </TouchableOpacity>
+                    </View>
                     <Text style={styles.title}>Your Progress</Text>
                     <Text style={styles.subtitle}>
                         Track your safe sun exposure journey
@@ -126,11 +172,14 @@ export default function ProgressScreen() {
                     {/* Progress Bar */}
                     <View style={styles.progressBarContainer}>
                         <View style={styles.progressBarBackground}>
-                            <View
+                            <LinearGradient
+                                colors={GRADIENTS.primary}
                                 style={[
                                     styles.progressBarFill,
                                     { width: `${Math.min((todayMinutes / recommendedDaily) * 100, 100)}%` }
                                 ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
                             />
                         </View>
                         <Text style={styles.progressText}>
@@ -192,43 +241,68 @@ export default function ProgressScreen() {
                     </Text>
                 </View>
             </ScrollView>
+
+            <MenuDrawer
+                isVisible={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                navigation={navigation}
+                username={username}
+                profileImage={profileImage}
+                onLogout={async () => {
+                    // Handled by MenuDrawer internally calling logout utils, assumes navigation reset works
+                }}
+            />
         </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
         paddingBottom: moderateScale(100),
     },
     header: {
-        marginBottom: SPACING.xl,
-        paddingTop: SPACING.md,
+        marginBottom: SPACING.lg,
+        paddingTop: SPACING.xs,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between', // Changed to space-between for menu
+        marginBottom: SPACING.xs,
+    },
+    backButton: {
+        marginRight: SPACING.sm,
+        padding: SPACING.xs,
     },
     title: {
         ...TYPOGRAPHY.title,
         fontSize: moderateScale(32),
-        marginBottom: SPACING.xs,
+        color: colors.text,
     },
     subtitle: {
         ...TYPOGRAPHY.body,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         lineHeight: 24,
+        marginTop: SPACING.xs,
     },
     card: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.xl,
         marginBottom: SPACING.lg,
         ...SHADOWS.medium,
+        ...(colors.background === '#121212' ? GLASS.dark : GLASS.default),
+        borderWidth: 0,
     },
     cardTitle: {
         ...TYPOGRAPHY.heading,
         marginBottom: SPACING.lg,
+        color: colors.text,
     },
     progressContainer: {
         flexDirection: 'row',
@@ -239,30 +313,30 @@ const styles = StyleSheet.create({
     largeNumber: {
         fontSize: moderateScale(64),
         fontWeight: 'bold',
-        color: COLORS.primary,
+        color: colors.primary,
         marginRight: SPACING.sm,
     },
     largeUnit: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     progressBarContainer: {
         marginTop: SPACING.md,
     },
     progressBarBackground: {
         height: moderateScale(12),
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.full,
         overflow: 'hidden',
     },
     progressBarFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.full,
     },
     progressText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         textAlign: 'center',
         marginTop: SPACING.sm,
     },
@@ -273,11 +347,13 @@ const styles = StyleSheet.create({
     },
     statCard: {
         flex: 1,
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         alignItems: 'center',
         ...SHADOWS.small,
+        ...(colors.background === '#121212' ? GLASS.dark : GLASS.default),
+        borderWidth: 0,
     },
     statEmoji: {
         fontSize: moderateScale(40),
@@ -286,12 +362,12 @@ const styles = StyleSheet.create({
     statNumber: {
         fontSize: moderateScale(32),
         fontWeight: 'bold',
-        color: COLORS.primary,
+        color: colors.primary,
         marginBottom: SPACING.xs,
     },
     statLabel: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         textAlign: 'center',
     },
     statRow: {
@@ -300,38 +376,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: SPACING.md,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     statRowLabel: {
         ...TYPOGRAPHY.body,
-        color: COLORS.text,
+        color: colors.text,
     },
     statRowValue: {
         ...TYPOGRAPHY.subheading,
         fontWeight: '600',
-        color: COLORS.primary,
+        color: colors.primary,
     },
     tipsCard: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.lg,
         borderLeftWidth: 5,
-        borderLeftColor: COLORS.primary,
+        borderLeftColor: colors.primary,
         ...SHADOWS.small,
     },
     tipsTitle: {
         ...TYPOGRAPHY.subheading,
         fontWeight: 'bold',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     tipsText: {
         ...TYPOGRAPHY.body,
         lineHeight: 24,
-        color: COLORS.text,
+        color: colors.text,
     },
     disclaimer: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.md,
         padding: SPACING.md,
         marginTop: SPACING.md,
@@ -339,7 +416,7 @@ const styles = StyleSheet.create({
     disclaimerText: {
         ...TYPOGRAPHY.caption,
         fontStyle: 'italic',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 20,
     },

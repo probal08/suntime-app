@@ -26,7 +26,9 @@ export const getUserSettings = async () => {
 
 export const setOnboarded = async (skinType) => {
     try {
+        const currentSettings = await getUserSettings();
         const settings = {
+            ...currentSettings,
             skinType,
             isOnboarded: true,
         };

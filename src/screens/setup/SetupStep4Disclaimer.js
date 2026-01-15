@@ -10,11 +10,16 @@ import {
     Platform
 } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
 import { AlertTriangle, Info, ShieldAlert, Heart, Activity } from 'lucide-react-native';
 import { completeSetup, saveDisclaimerAcceptance } from '../../utils/storage';
+import { useTheme } from '../../context/ThemeContext';
+
+import * as Notifications from 'expo-notifications';
 
 export default function SetupStep4Disclaimer({ navigation }) {
+    const { colors, isDark } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
     const [accepted, setAccepted] = useState(false);
     const [isCompleting, setIsCompleting] = useState(false);
 
@@ -26,6 +31,10 @@ export default function SetupStep4Disclaimer({ navigation }) {
 
         setIsCompleting(true);
         try {
+            // Request Notification Permissions
+            const { status } = await Notifications.requestPermissionsAsync();
+            console.log('Notification permission status:', status);
+
             console.log('Completing setup...');
             // Save disclaimer acceptance
             await saveDisclaimerAcceptance();
@@ -67,7 +76,7 @@ export default function SetupStep4Disclaimer({ navigation }) {
                     entering={FadeInDown}
                     style={styles.header}
                 >
-                    <AlertTriangle color={COLORS.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
+                    <AlertTriangle color={colors.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
                     <Text style={styles.title}>Important Health Notice</Text>
                 </Animated.View>
 
@@ -80,7 +89,7 @@ export default function SetupStep4Disclaimer({ navigation }) {
 
                     <View style={styles.disclaimerSection}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
-                            <Info color={COLORS.primary} size={20} style={{ marginRight: SPACING.sm }} />
+                            <Info color={colors.primary} size={20} style={{ marginRight: SPACING.sm }} />
                             <Text style={styles.disclaimerHeading}>Estimates Only</Text>
                         </View>
                         <Text style={styles.disclaimerText}>
@@ -91,7 +100,7 @@ export default function SetupStep4Disclaimer({ navigation }) {
 
                     <View style={styles.disclaimerSection}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
-                            <ShieldAlert color={COLORS.primary} size={20} style={{ marginRight: SPACING.sm }} />
+                            <ShieldAlert color={colors.primary} size={20} style={{ marginRight: SPACING.sm }} />
                             <Text style={styles.disclaimerHeading}>Consult Healthcare Professionals</Text>
                         </View>
                         <Text style={styles.disclaimerText}>
@@ -103,7 +112,7 @@ export default function SetupStep4Disclaimer({ navigation }) {
 
                     <View style={styles.disclaimerSection}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
-                            <Activity color={COLORS.primary} size={20} style={{ marginRight: SPACING.sm }} />
+                            <Activity color={colors.primary} size={20} style={{ marginRight: SPACING.sm }} />
                             <Text style={styles.disclaimerHeading}>Never Burn</Text>
                         </View>
                         <Text style={styles.disclaimerText}>
@@ -114,7 +123,7 @@ export default function SetupStep4Disclaimer({ navigation }) {
 
                     <View style={styles.disclaimerSection}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
-                            <Heart color={COLORS.primary} size={20} style={{ marginRight: SPACING.sm }} />
+                            <Heart color={colors.primary} size={20} style={{ marginRight: SPACING.sm }} />
                             <Text style={styles.disclaimerHeading}>Listen to Your Body</Text>
                         </View>
                         <Text style={styles.disclaimerText}>
@@ -152,10 +161,10 @@ export default function SetupStep4Disclaimer({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
@@ -166,17 +175,17 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: moderateScale(6),
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.full,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     progressText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginTop: SPACING.xs,
         textAlign: 'center',
     },
@@ -191,21 +200,23 @@ const styles = StyleSheet.create({
     title: {
         ...TYPOGRAPHY.title,
         textAlign: 'center',
+        color: colors.text,
     },
     disclaimerCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.xl,
         marginBottom: SPACING.xl,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         ...SHADOWS.medium,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     disclaimerTitle: {
         ...TYPOGRAPHY.heading,
         marginBottom: SPACING.lg,
         textAlign: 'center',
-        color: COLORS.primary,
+        color: colors.primary,
     },
     disclaimerSection: {
         marginBottom: SPACING.lg,
@@ -214,36 +225,38 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.subheading,
         fontWeight: '700',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     disclaimerText: {
         ...TYPOGRAPHY.body,
         lineHeight: 24,
-        color: COLORS.text,
+        color: colors.text,
     },
     acceptanceContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.lg,
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     checkbox: {
         width: moderateScale(28),
         height: moderateScale(28),
         borderRadius: BORDER_RADIUS.sm,
         borderWidth: 2,
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
         marginRight: SPACING.md,
         justifyContent: 'center',
         alignItems: 'center',
     },
     checkboxAccepted: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     checkmark: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: moderateScale(18),
         fontWeight: 'bold',
     },
@@ -251,9 +264,10 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.body,
         flex: 1,
         fontWeight: '600',
+        color: colors.text,
     },
     completeButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md + 2,
         alignItems: 'center',
@@ -264,7 +278,7 @@ const styles = StyleSheet.create({
     },
     completeButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
         fontSize: moderateScale(18),
     },

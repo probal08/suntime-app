@@ -10,11 +10,14 @@ import {
     Platform
 } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
 import { Shield, Check, Sun } from 'lucide-react-native';
 import { saveDefaultPreferences } from '../../utils/storage';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function SetupStep2Sunscreen({ navigation }) {
+    const { colors, isDark } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
     const [useSunscreen, setUseSunscreen] = useState(null);
 
     const handleContinue = async () => {
@@ -57,7 +60,7 @@ export default function SetupStep2Sunscreen({ navigation }) {
                     entering={FadeInDown}
                     style={styles.header}
                 >
-                    <Shield color={COLORS.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
+                    <Shield color={colors.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
                     <Text style={styles.title}>Sunscreen Usage</Text>
                     <Text style={styles.subtitle}>
                         Do you typically use sunscreen when going outside? This sets your default preference.
@@ -75,7 +78,7 @@ export default function SetupStep2Sunscreen({ navigation }) {
                             onPress={() => setUseSunscreen(true)}
                         >
                             <View style={styles.optionContent}>
-                                <Check color={COLORS.primary} size={moderateScale(32)} style={{ marginRight: SPACING.md }} />
+                                <Check color={colors.primary} size={moderateScale(32)} style={{ marginRight: SPACING.md }} />
                                 <View style={styles.optionText}>
                                     <Text style={styles.optionTitle}>Yes, I use sunscreen</Text>
                                     <Text style={styles.optionDescription}>
@@ -98,7 +101,7 @@ export default function SetupStep2Sunscreen({ navigation }) {
                             onPress={() => setUseSunscreen(false)}
                         >
                             <View style={styles.optionContent}>
-                                <Sun color={COLORS.primary} size={moderateScale(32)} style={{ marginRight: SPACING.md }} />
+                                <Sun color={colors.primary} size={moderateScale(32)} style={{ marginRight: SPACING.md }} />
                                 <View style={styles.optionText}>
                                     <Text style={styles.optionTitle}>No, I don't use sunscreen</Text>
                                     <Text style={styles.optionDescription}>
@@ -127,7 +130,7 @@ export default function SetupStep2Sunscreen({ navigation }) {
                     disabled={useSunscreen === null}
                 >
                     <Text style={styles.continueButtonText}>
-                        Continue →
+                        Continue
                     </Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -135,10 +138,10 @@ export default function SetupStep2Sunscreen({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
@@ -149,17 +152,17 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: moderateScale(6),
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.full,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     progressText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginTop: SPACING.xs,
         textAlign: 'center',
     },
@@ -175,11 +178,12 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.title,
         textAlign: 'center',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     subtitle: {
         ...TYPOGRAPHY.body,
         textAlign: 'center',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         paddingHorizontal: SPACING.md,
         lineHeight: moderateScale(24),
     },
@@ -187,19 +191,20 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.lg,
     },
     optionCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.md,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     optionCardSelected: {
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
         borderWidth: 3,
         ...SHADOWS.medium,
     },
@@ -219,29 +224,32 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.subheading,
         fontWeight: '600',
         marginBottom: SPACING.xs,
+        color: colors.text,
     },
     optionDescription: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     checkmark: {
         fontSize: moderateScale(28),
-        color: COLORS.primary,
+        color: colors.primary,
     },
     infoCard: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.xl,
         borderLeftWidth: 4,
-        borderLeftColor: COLORS.primary,
+        borderLeftColor: colors.primary,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     infoText: {
         ...TYPOGRAPHY.body,
         lineHeight: 22,
+        color: colors.text,
     },
     continueButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md + 2,
         alignItems: 'center',
@@ -252,7 +260,7 @@ const styles = StyleSheet.create({
     },
     continueButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
     },
 });

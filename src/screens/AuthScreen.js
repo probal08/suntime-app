@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -22,7 +22,9 @@ import Animated, {
     withSpring,
     withSequence
 } from 'react-native-reanimated';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
+import { SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GRADIENTS, GLASS, COLORS } from '../constants/theme';
 import {
     saveCredentials,
     verifyPassword,
@@ -31,9 +33,14 @@ import {
     checkBiometricAvailable,
     isBiometricEnabled,
     isUserRegistered,
+    getSecurityQuestion,
+    verifySecurityAnswer,
+    resetPassword,
 } from '../utils/auth';
 
 export default function AuthScreen({ navigation }) {
+    const { colors, isDark } = useTheme();
+    const styles = useMemo(() => getStyles(colors), [colors]);
     const [mode, setMode] = useState('login'); // 'login' or 'register'
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -42,6 +49,14 @@ export default function AuthScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const [biometricAvailable, setBiometricAvailable] = useState(false);
     const [hasAccount, setHasAccount] = useState(false);
+
+    // Security Question State
+    const [securityQuestion, setSecurityQuestion] = useState('');
+    const [securityAnswer, setSecurityAnswer] = useState('');
+
+    // Recovery State
+    const [recoveryStep, setRecoveryStep] = useState(0); // 0: Username, 1: Answer, 2: New Password
+    const [recoveryQuestion, setRecoveryQuestion] = useState('');
 
     // Animation values
     const sunRotation = useSharedValue(0);
@@ -104,15 +119,82 @@ export default function AuthScreen({ navigation }) {
             return;
         }
 
+        if (!securityQuestion.trim() || !securityAnswer.trim()) {
+            Alert.alert('Error', 'Please set a security question and answer for account recovery');
+            return;
+        }
+
         setLoading(true);
         try {
-            await saveCredentials(username, password, enableBiometric);
+            await saveCredentials(username, password, enableBiometric, securityQuestion, securityAnswer);
             setLoading(false);
             navigation.replace('SetupStep1');
         } catch (error) {
             console.error('Registration error:', error);
             setLoading(false);
             Alert.alert('Error', 'Registration failed: ' + error.message);
+        }
+    };
+
+    const handleRecovery = async () => {
+        if (recoveryStep === 0) {
+            // Step 1: Check Username
+            if (!username) {
+                Alert.alert('Error', 'Please enter your username');
+                return;
+            }
+            // In a local app, we verify simply by checking if security question exists
+            // But we should verify if the username matches the stored one
+            const storedUsername = await getUsername();
+            if (storedUsername !== username) {
+                Alert.alert('Error', 'Username not found');
+                return;
+            }
+
+            const question = await getSecurityQuestion();
+            if (question) {
+                setRecoveryQuestion(question);
+                setRecoveryStep(1);
+            } else {
+                Alert.alert('Error', 'No security question set for this account.');
+            }
+        } else if (recoveryStep === 1) {
+            // Step 2: Verify Answer
+            if (!securityAnswer) {
+                Alert.alert('Error', 'Please enter your answer');
+                return;
+            }
+            const isValid = await verifySecurityAnswer(securityAnswer);
+            if (isValid) {
+                setRecoveryStep(2);
+                setSecurityAnswer(''); // Clear for security
+            } else {
+                Alert.alert('Error', 'Incorrect answer');
+            }
+        } else if (recoveryStep === 2) {
+            // Step 3: Reset Password
+            if (!password || password.length < 6) {
+                Alert.alert('Error', 'Password must be at least 6 characters');
+                return;
+            }
+            if (password !== confirmPassword) {
+                Alert.alert('Error', 'Passwords do not match');
+                return;
+            }
+
+            setLoading(true);
+            const success = await resetPassword(password);
+            setLoading(false);
+
+            if (success) {
+                Alert.alert('Success', 'Password reset successfully. Please login.');
+                setMode('login');
+                setRecoveryStep(0);
+                setPassword('');
+                setConfirmPassword('');
+            } else {
+                Alert.alert('Error', 'Failed to reset password');
+            }
         }
     };
 
@@ -167,6 +249,12 @@ export default function AuthScreen({ navigation }) {
 
     return (
         <View style={styles.container}>
+            <LinearGradient
+                colors={isDark ? GRADIENTS.night : GRADIENTS.sunrise}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            />
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -194,39 +282,57 @@ export default function AuthScreen({ navigation }) {
 
                             {/* Mode Switcher with smooth transition */}
                             <View style={styles.modeContainer}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modeButton,
-                                        mode === 'login' && styles.modeButtonActive,
-                                    ]}
-                                    onPress={() => setMode('login')}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.modeText,
-                                            mode === 'login' && styles.modeTextActive,
-                                        ]}
-                                    >
-                                        Login
-                                    </Text>
-                                </TouchableOpacity>
+                                {mode !== 'forgot' ? (
+                                    <>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.modeButton,
+                                                mode === 'login' && styles.modeButtonActive,
+                                            ]}
+                                            onPress={() => setMode('login')}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.modeText,
+                                                    mode === 'login' && styles.modeTextActive,
+                                                ]}
+                                            >
+                                                Login
+                                            </Text>
+                                        </TouchableOpacity>
 
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modeButton,
-                                        mode === 'register' && styles.modeButtonActive,
-                                    ]}
-                                    onPress={() => setMode('register')}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.modeText,
-                                            mode === 'register' && styles.modeTextActive,
-                                        ]}
-                                    >
-                                        Register
-                                    </Text>
-                                </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.modeButton,
+                                                mode === 'register' && styles.modeButtonActive,
+                                                hasAccount && { opacity: 0.5 }
+                                            ]}
+                                            onPress={() => {
+                                                if (hasAccount) {
+                                                    Alert.alert('Account Exists', 'An account is already set up on this device. Please login or reset the app data from device settings to create a new one.');
+                                                } else {
+                                                    setMode('register');
+                                                }
+                                            }}
+                                            activeOpacity={hasAccount ? 1 : 0.7}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.modeText,
+                                                    mode === 'register' && styles.modeTextActive,
+                                                ]}
+                                            >
+                                                Register
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </>
+                                ) : (
+                                    <View style={styles.modeButtonActive}>
+                                        <Text style={[styles.modeText, styles.modeTextActive]}>
+                                            Reset Password
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Form Card with glassmorphism */}
@@ -239,13 +345,49 @@ export default function AuthScreen({ navigation }) {
                                             <TextInput
                                                 style={styles.input}
                                                 placeholder="Choose a username"
-                                                placeholderTextColor={COLORS.textLight}
+                                                placeholderTextColor={colors.textLight}
                                                 value={username}
                                                 onChangeText={setUsername}
                                                 autoCapitalize="none"
                                             />
                                         </View>
                                         <Text style={styles.hint}>Minimum 3 characters</Text>
+                                    </View>
+                                )}
+
+                                {/* Forgot Password - Step 0: Username */}
+                                {mode === 'forgot' && recoveryStep === 0 && (
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Enter Username</Text>
+                                        <View style={styles.inputWrapper}>
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder="Your username"
+                                                placeholderTextColor={colors.textLight}
+                                                value={username}
+                                                onChangeText={setUsername}
+                                                autoCapitalize="none"
+                                            />
+                                        </View>
+                                    </View>
+                                )}
+
+                                {/* Forgot Password - Step 1: Answer Question */}
+                                {mode === 'forgot' && recoveryStep === 1 && (
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Security Question</Text>
+                                        <Text style={[styles.subtitle, { marginBottom: SPACING.md, textAlign: 'left' }]}>
+                                            {recoveryQuestion}
+                                        </Text>
+                                        <View style={styles.inputWrapper}>
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder="Your answer"
+                                                placeholderTextColor={colors.textLight}
+                                                value={securityAnswer}
+                                                onChangeText={setSecurityAnswer}
+                                            />
+                                        </View>
                                     </View>
                                 )}
 
@@ -257,39 +399,74 @@ export default function AuthScreen({ navigation }) {
                                     </View>
                                 )}
 
-                                {/* Password Input */}
-                                <View style={styles.inputGroup}>
-                                    <Text style={styles.label}>Password</Text>
-                                    <View style={styles.inputWrapper}>
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Enter password"
-                                            placeholderTextColor={COLORS.textLight}
-                                            value={password}
-                                            onChangeText={setPassword}
-                                            secureTextEntry
-                                        />
+                                {/* Password Input (Login/Register/Forgot Step 2) */}
+                                {(mode === 'login' || mode === 'register' || (mode === 'forgot' && recoveryStep === 2)) && (
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>
+                                            {mode === 'forgot' ? 'New Password' : 'Password'}
+                                        </Text>
+                                        <View style={styles.inputWrapper}>
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder={mode === 'forgot' ? "Enter new password" : "Enter password"}
+                                                placeholderTextColor={colors.textLight}
+                                                value={password}
+                                                onChangeText={setPassword}
+                                                secureTextEntry
+                                            />
+                                        </View>
+                                        <Text style={styles.hint}>
+                                            {mode === 'register' || mode === 'forgot' ? 'Minimum 6 characters' : 'Enter your password'}
+                                        </Text>
                                     </View>
-                                    <Text style={styles.hint}>
-                                        {mode === 'register' ? 'Minimum 6 characters' : 'Enter your password'}
-                                    </Text>
-                                </View>
+                                )}
 
-                                {/* Confirm Password (Register only) */}
-                                {mode === 'register' && (
+                                {/* Confirm Password (Register or Forgot Step 2) */}
+                                {(mode === 'register' || (mode === 'forgot' && recoveryStep === 2)) && (
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>Confirm Password</Text>
                                         <View style={styles.inputWrapper}>
                                             <TextInput
                                                 style={styles.input}
                                                 placeholder="Re-enter password"
-                                                placeholderTextColor={COLORS.textLight}
+                                                placeholderTextColor={colors.textLight}
                                                 value={confirmPassword}
                                                 onChangeText={setConfirmPassword}
                                                 secureTextEntry
                                             />
                                         </View>
                                     </View>
+                                )}
+
+                                {/* Security Question (Register Only) */}
+                                {mode === 'register' && (
+                                    <>
+                                        <View style={styles.inputGroup}>
+                                            <Text style={styles.label}>Security Question</Text>
+                                            <View style={styles.inputWrapper}>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    placeholder="e.g. What is your pet's name?"
+                                                    placeholderTextColor={colors.textLight}
+                                                    value={securityQuestion}
+                                                    onChangeText={setSecurityQuestion}
+                                                />
+                                            </View>
+                                        </View>
+                                        <View style={styles.inputGroup}>
+                                            <Text style={styles.label}>Security Answer</Text>
+                                            <View style={styles.inputWrapper}>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    placeholder="Your answer"
+                                                    placeholderTextColor={colors.textLight}
+                                                    value={securityAnswer}
+                                                    onChangeText={setSecurityAnswer}
+                                                />
+                                            </View>
+                                            <Text style={styles.hint}>Used for password recovery</Text>
+                                        </View>
+                                    </>
                                 )}
 
                                 {/* Biometric Toggle (Register only) */}
@@ -309,17 +486,61 @@ export default function AuthScreen({ navigation }) {
                                     </TouchableOpacity>
                                 )}
 
+
+
+                                {/* Forgot Password Link (Login Only) */}
+                                {mode === 'login' && hasAccount && (
+                                    <TouchableOpacity
+                                        style={{ alignSelf: 'flex-end', marginBottom: SPACING.md }}
+                                        onPress={async () => {
+                                            const question = await getSecurityQuestion();
+                                            if (question) {
+                                                setMode('forgot');
+                                                setRecoveryQuestion(question);
+                                                setRecoveryStep(1); // Skip username, go directly to question
+                                                setSecurityAnswer('');
+                                                setPassword('');
+                                                setConfirmPassword('');
+                                            } else {
+                                                Alert.alert('Error', 'No security question found. Please reset app data to create a new account.');
+                                            }
+                                        }}
+                                    >
+                                        <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                                            Forgot Password?
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {/* Cancel Recovery Link */}
+                                {mode === 'forgot' && (
+                                    <TouchableOpacity
+                                        style={{ alignSelf: 'center', marginBottom: SPACING.md }}
+                                        onPress={() => setMode('login')}
+                                    >
+                                        <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                                            Cancel
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+
                                 {/* Action Button */}
                                 <TouchableOpacity
                                     style={[styles.actionButton, loading && styles.buttonDisabled]}
-                                    onPress={mode === 'login' ? handleLogin : handleRegister}
+                                    onPress={
+                                        mode === 'login' ? handleLogin :
+                                            mode === 'register' ? handleRegister :
+                                                handleRecovery
+                                    }
                                     disabled={loading}
                                 >
-                                    <View style={[styles.buttonContent, loading && { backgroundColor: COLORS.gray }]}>
+                                    <View style={[styles.buttonContent, loading && { backgroundColor: colors.gray }]}>
                                         <Text style={styles.actionButtonText}>
                                             {loading
-                                                ? (mode === 'login' ? 'Logging in...' : 'Creating account...')
-                                                : (mode === 'login' ? 'Login' : 'Create Account')}
+                                                ? 'Processing...'
+                                                : (mode === 'login' ? 'Login' :
+                                                    mode === 'register' ? 'Create Account' :
+                                                        mode === 'forgot' ? (recoveryStep < 2 ? 'Next' : 'Reset Password') : 'Submit')}
                                         </Text>
                                     </View>
                                 </TouchableOpacity>
@@ -347,14 +568,14 @@ export default function AuthScreen({ navigation }) {
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
-        </View>
+        </View >
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     safeArea: {
         flex: 1,
@@ -365,7 +586,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.xxl * 2,
+        paddingTop: SPACING.xl,
         paddingBottom: SPACING.xxl,
     },
     content: {
@@ -381,28 +602,34 @@ const styles = StyleSheet.create({
     },
     sunIcon: {
         fontSize: moderateScale(80),
-        color: COLORS.primary,
+        color: COLORS.white, // White sun on gradient looks better
+        textShadowColor: 'rgba(255, 255, 255, 0.5)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 20,
     },
     title: {
         fontSize: moderateScale(48),
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: COLORS.white, // White text on gradient
         marginBottom: SPACING.sm,
+        textShadowColor: 'rgba(0,0,0,0.2)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
     subtitle: {
         fontSize: moderateScale(16),
-        color: COLORS.textSecondary,
+        color: 'rgba(255, 255, 255, 0.9)',
         textAlign: 'center',
         fontWeight: '500',
     },
     modeContainer: {
         flexDirection: 'row',
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: 'rgba(0,0,0,0.1)', // Subtle tint
         borderRadius: BORDER_RADIUS.lg,
         padding: 4,
         marginBottom: SPACING.xl,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: 'rgba(255,255,255,0.2)',
     },
     modeButton: {
         flex: 1,
@@ -411,27 +638,27 @@ const styles = StyleSheet.create({
         borderRadius: BORDER_RADIUS.md,
     },
     modeButtonActive: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         ...SHADOWS.small,
     },
     modeText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         fontWeight: '600',
     },
     modeTextActive: {
-        color: COLORS.white,
+        color: colors.white,
     },
     formCard: {
-        backgroundColor: COLORS.cardBackground,
+        ...(colors === '#121212' || colors.background === '#121212' ? GLASS.dark : GLASS.default), // Use Glassmorphism
+        backgroundColor: colors.cardBackground, // Fallback/Mix
         borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.xl,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.medium,
+        ...SHADOWS.large,
+        width: '100%',
     },
     welcomeCard: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.lg,
@@ -439,13 +666,13 @@ const styles = StyleSheet.create({
     },
     welcomeLabel: {
         fontSize: moderateScale(14),
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginBottom: SPACING.xs,
     },
     welcomeUsername: {
         fontSize: moderateScale(24),
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
     },
     inputGroup: {
         marginBottom: SPACING.lg,
@@ -454,26 +681,26 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.body,
         fontWeight: '600',
         marginBottom: SPACING.sm,
-        color: COLORS.text,
+        color: colors.text,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         paddingHorizontal: SPACING.md,
     },
     input: {
         flex: 1,
         paddingVertical: SPACING.md,
         fontSize: moderateScale(16),
-        color: COLORS.text,
+        color: colors.text,
     },
     hint: {
         fontSize: moderateScale(12),
-        color: COLORS.textLight,
+        color: colors.textLight,
         marginTop: SPACING.xs,
         fontStyle: 'italic',
     },
@@ -496,23 +723,23 @@ const styles = StyleSheet.create({
         height: moderateScale(24),
         borderRadius: BORDER_RADIUS.sm,
         borderWidth: 2,
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
         marginRight: SPACING.md,
         justifyContent: 'center',
         alignItems: 'center',
     },
     checkboxChecked: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     checkmark: {
-        color: COLORS.white,
+        color: colors.white,
         fontSize: 16,
         fontWeight: 'bold',
     },
     biometricText: {
         flex: 1,
-        color: COLORS.text,
+        color: colors.text,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -525,25 +752,25 @@ const styles = StyleSheet.create({
     buttonContent: {
         paddingVertical: SPACING.md + 4,
         alignItems: 'center',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     actionButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: 'bold',
         fontSize: moderateScale(18),
     },
     biometricButton: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         paddingVertical: SPACING.md,
         alignItems: 'center',
         marginTop: SPACING.md,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     biometricButtonText: {
-        color: COLORS.text,
+        color: colors.text,
         fontSize: moderateScale(16),
         fontWeight: '600',
     },
@@ -552,7 +779,7 @@ const styles = StyleSheet.create({
         paddingTop: SPACING.xl,
     },
     footerText: {
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         fontSize: 13,
         textAlign: 'center',
         fontStyle: 'italic',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -10,7 +10,8 @@ import {
     InteractionManager,
     BackHandler,
     ToastAndroid,
-    Platform
+    Platform,
+    AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,8 +27,13 @@ import Animated, {
     withSpring,
     ZoomIn
 } from 'react-native-reanimated';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../constants/theme';
-import { getUserSettings, getManualUV, addSessionLog, getDefaultPreferences } from '../utils/storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
+import { SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GRADIENTS, GLASS, COLORS } from '../constants/theme';
+import { MoreVertical } from 'lucide-react-native';
+import MenuDrawer from '../components/MenuDrawer';
+import { getUserSettings, getManualUV, addSessionLog, getDefaultPreferences, getSessionLogs, getProfileImage } from '../utils/storage';
+import { getUsername, logout } from '../utils/auth';
 import { calculateSafeTime, getUVCategory } from '../utils/sunLogic';
 
 const UV_SCALE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
@@ -47,7 +53,9 @@ const RISK_LEVELS = [
     { range: '11+', level: 'Extreme', color: '#6A1B9A' },
 ];
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
+    const { colors, isDark } = useTheme();
+    const styles = useMemo(() => getStyles(colors), [colors]);
     // UV state
     const [uvIndex, setUvIndex] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -55,6 +63,7 @@ export default function HomeScreen() {
     const [isCloudy, setIsCloudy] = useState(false);
     const [hasSunscreen, setHasSunscreen] = useState(false);
     const [safeMinutes, setSafeMinutes] = useState(30);
+    const [isManualData, setIsManualData] = useState(false); // Track if using manual override
 
     // Timer state - TIMESTAMP-BASED for robustness
     const [timeLeft, setTimeLeft] = useState(1800); // seconds
@@ -62,6 +71,9 @@ export default function HomeScreen() {
     const [hasStarted, setHasStarted] = useState(false); // New state to track if timer was ever started
     const [endTimestamp, setEndTimestamp] = useState(null); // CRITICAL: stores when timer should end
     const intervalRef = useRef(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [username, setUsername] = useState('User');
+    const [profileImage, setProfileImage] = useState(null);
 
     // Animation values
     const pulseValue = useSharedValue(1);
@@ -89,8 +101,9 @@ export default function HomeScreen() {
         return () => task.cancel();
     }, []);
 
+    // Disabled pulse animation as per user feedback ("jumping")
     const animatedUVStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: pulseValue.value }],
+        transform: [{ scale: 1 }],
     }));
 
     // Fetch UV Index from Open-Meteo API
@@ -138,6 +151,50 @@ export default function HomeScreen() {
         }, [])
     );
 
+    // Schedule Daily Reminder (Smart Logic)
+    useEffect(() => {
+        const updateDailyNotification = async () => {
+            try {
+                // Get logs for TODAY
+                const logs = await getSessionLogs();
+                const today = new Date().toISOString().split('T')[0];
+                const hasSessionToday = logs.some(log => log.date.startsWith(today));
+
+                // Cancel existing daily notification
+                const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+                const dailyId = scheduled.find(n => n.content.title.includes('Daily Sun Goal'))?.identifier;
+
+                if (dailyId) {
+                    await Notifications.cancelScheduledNotificationAsync(dailyId);
+                }
+
+                // Determine message based on state
+                const content = hasSessionToday ? {
+                    title: 'Daily Sun Goal 🌞',
+                    body: 'Great job meeting your sunlight goal today!',
+                } : {
+                    title: 'Daily Sun Goal 🌙',
+                    body: "You missed today's goal. Let's try again tomorrow!",
+                };
+
+                // Schedule for 6 PM
+                await Notifications.scheduleNotificationAsync({
+                    content,
+                    trigger: {
+                        hour: 18,
+                        minute: 0,
+                        repeats: true, // Recurring check
+                    },
+                });
+                console.log('Updated Daily Notification:', content.body);
+            } catch (e) {
+                console.log('Schedule error', e);
+            }
+        };
+
+        updateDailyNotification();
+    }, []); // Run only once on mount (updates are handled manually via handleTimerComplete)
+
     // Initialize data
     useEffect(() => {
         initializeData();
@@ -168,10 +225,11 @@ export default function HomeScreen() {
         if (isActive && endTimestamp) {
             intervalRef.current = setInterval(() => {
                 // Calculate remaining time from timestamp
-                const remaining = Math.max(0, Math.floor((endTimestamp - Date.now()) / 1000));
+                const remaining = Math.max(0, Math.ceil((endTimestamp - Date.now()) / 1000));
                 setTimeLeft(remaining);
 
                 if (remaining <= 0) {
+                    if (intervalRef.current) clearInterval(intervalRef.current);
                     handleTimerComplete();
                 }
             }, 1000);
@@ -206,9 +264,11 @@ export default function HomeScreen() {
             if (manualUV !== null && manualUV !== undefined) {
                 console.log('✅ Using manual UV:', manualUV);
                 setUvIndex(manualUV);
+                setIsManualData(true);
                 setLoading(false);
                 return; // Exit early - don't fetch from API
             }
+            setIsManualData(false);
 
             console.log('No manual UV set, checking location/API...');
 
@@ -232,8 +292,18 @@ export default function HomeScreen() {
                 currentLocation.coords.longitude
             );
 
-            setUvIndex(uv !== null ? uv : 5);
+            const finalUV = uv !== null ? uv : 5;
+            setUvIndex(finalUV);
+            // Debug alert removed for production
             setLoading(false);
+
+            setLoading(false);
+
+            // Fetch user info for menu
+            const user = await getUsername();
+            if (user) setUsername(user);
+            const img = await getProfileImage();
+            if (img) setProfileImage(img);
         } catch (error) {
             console.error('Error initializing data:', error);
             setUvIndex(5);
@@ -243,6 +313,7 @@ export default function HomeScreen() {
 
     const handleTimerComplete = async () => {
         setIsActive(false);
+        if (intervalRef.current) clearInterval(intervalRef.current);
 
         // Trigger haptic feedback
         try {
@@ -251,19 +322,42 @@ export default function HomeScreen() {
             console.error('Haptics error:', error);
         }
 
-        // Send notification
+        // Send notification ONLY if app is in background
+        if (AppState.currentState !== 'active') {
+            try {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: '⏰ Sun Exposure Complete!',
+                        body: 'Your safe sun time is up. Consider seeking shade.',
+                        sound: true,
+                    },
+                    trigger: null,
+                });
+            } catch (error) {
+                console.error('Notification error:', error);
+            }
+        }
+
+        // Update daily notification (Switch to "Goal Met")
         try {
+            // Cancel existing
+            const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+            const dailyId = scheduled.find(n => n.content.title.includes('Daily Sun Goal'))?.identifier;
+            if (dailyId) await Notifications.cancelScheduledNotificationAsync(dailyId);
+
+            // Schedule "Goal Met"
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: '⏰ Sun Exposure Complete!',
-                    body: 'Your safe sun time is up. Consider seeking shade.',
-                    sound: true,
+                    title: 'Daily Sun Goal 🌞',
+                    body: 'Great job meeting your sunlight goal today!',
                 },
-                trigger: null,
+                trigger: {
+                    hour: 18,
+                    minute: 0,
+                    repeats: true,
+                },
             });
-        } catch (error) {
-            console.error('Notification error:', error);
-        }
+        } catch (e) { console.log('Update notif error', e); }
 
         // Log the session
         console.log('⏰ Timer complete! Logging session:', {
@@ -311,7 +405,7 @@ export default function HomeScreen() {
     if (loading) {
         return (
             <SafeAreaView style={styles.container}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Fetching UV data...</Text>
             </SafeAreaView>
         );
@@ -325,13 +419,32 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <LinearGradient
+                colors={isDark ? GRADIENTS.night : GRADIENTS.sunrise}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                opacity={isDark ? 0.8 : 0.3} // Slightly more opaque in dark mode for better contrast, subtle in light
+            />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text style={styles.logo}>Suntime</Text>
+                    <View style={{ width: 40 }} />
+                    <LinearGradient
+                        colors={GRADIENTS.primary}
+                        style={{ padding: 2, borderRadius: 8, opacity: 0.9 }}
+                    >
+                        <Text style={[styles.logo, { color: colors.white }]}>Suntime</Text>
+                    </LinearGradient>
+                    <TouchableOpacity
+                        style={styles.menuButton}
+                        onPress={() => setIsMenuOpen(true)}
+                    >
+                        <MoreVertical size={moderateScale(24)} color={colors.text} />
+                    </TouchableOpacity>
                 </View>
 
                 {/* FEATURE 1: UV INDEX COLOR SCALE */}
@@ -365,33 +478,36 @@ export default function HomeScreen() {
                     </ScrollView>
                 </View>
 
-                {/* UV Widget */}
-                <Animated.View
-                    entering={FadeInDown}
-                    style={[styles.uvWidget, { borderColor: uvCategory.color }]}
-                >
-                    <Animated.View style={[styles.uvInfo, animatedUVStyle]}>
-                        <Text style={styles.uvLabel}>UV Index</Text>
-                        <Text style={[styles.uvValue, { color: uvCategory.color }]}>
-                            {(uvIndex || 0).toFixed(1)}
-                        </Text>
-                        <Text style={[styles.uvLevel, { color: uvCategory.color }]}>
-                            {uvCategory.level}
-                        </Text>
-                    </Animated.View>
+                {/* UV Widget - Glass Effect */}
+                <Animated.View entering={FadeInDown} style={styles.uvWidgetContainer}>
+                    <LinearGradient
+                        colors={GRADIENTS.darkCard}
+                        style={styles.uvWidgetGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <Animated.View style={[styles.uvInfo, animatedUVStyle]}>
+                            <Text style={[styles.uvLabel, { color: COLORS.white }]}>
+                                {isManualData ? 'MANUAL UV' : 'UV INDEX'}
+                            </Text>
+                            <Text style={[styles.uvValue, { color: uvCategory.color }]}>
+                                {(uvIndex || 0).toFixed(1)}
+                            </Text>
+                            <Text style={[styles.uvLevel, { color: uvCategory.color }]}>
+                                {uvCategory.level}
+                            </Text>
+                        </Animated.View>
+                    </LinearGradient>
                 </Animated.View>
 
                 {/* Circular Countdown Timer */}
-                <Animated.View
-                    entering={ZoomIn}
-                    style={styles.timerContainer}
-                >
+                <Animated.View entering={ZoomIn} style={styles.timerContainer}>
                     <View style={styles.circularTimer}>
                         <View
                             style={[
                                 styles.progressRing,
                                 {
-                                    borderColor: progress > 20 ? COLORS.success : COLORS.danger,
+                                    borderColor: progress > 20 ? colors.success : colors.danger,
                                 },
                             ]}
                         />
@@ -404,8 +520,15 @@ export default function HomeScreen() {
                     {/* Timer Controls */}
                     <View style={styles.controlsContainer}>
                         {!isActive ? (
-                            <TouchableOpacity style={styles.startButton} onPress={startTimer}>
-                                <Text style={styles.buttonText}>Start Timer</Text>
+                            <TouchableOpacity onPress={startTimer} style={styles.shadowButtonWrapper}>
+                                <LinearGradient
+                                    colors={GRADIENTS.primary}
+                                    style={styles.startButton}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                >
+                                    <Text style={styles.buttonText}>Start Timer</Text>
+                                </LinearGradient>
                             </TouchableOpacity>
                         ) : (
                             <View style={styles.activeControls}>
@@ -487,14 +610,30 @@ export default function HomeScreen() {
                     <Text style={styles.disclaimerText}>Estimates only. Not medical advice.</Text>
                 </View>
             </ScrollView>
+
+            {/* Slide-out Menu Drawer */}
+            <MenuDrawer
+                isVisible={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                navigation={navigation}
+                username={username}
+                profileImage={profileImage}
+                onLogout={async () => {
+                    await logout();
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Auth' }],
+                    });
+                }}
+            />
         </SafeAreaView >
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
@@ -504,27 +643,38 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.body,
         marginTop: SPACING.md,
         textAlign: 'center',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     header: {
         marginBottom: SPACING.xl,
         alignItems: 'center',
         paddingTop: SPACING.md,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: SPACING.xs,
+    },
+    menuButton: {
+        padding: SPACING.sm,
     },
     logo: {
         ...TYPOGRAPHY.title,
-        color: COLORS.primary,
+        color: colors.primary,
         fontWeight: 'bold',
         letterSpacing: -0.5,
+        flex: 1,
+        textAlign: 'center',
     },
-    uvWidget: {
-        backgroundColor: COLORS.cardBackground,
+    uvWidgetContainer: {
         borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.xl,
+        overflow: 'hidden',
         marginBottom: SPACING.xl,
-        alignItems: 'center',
-        borderWidth: 0,
         ...SHADOWS.medium,
+        width: '100%',
+    },
+    uvWidgetGradient: {
+        padding: SPACING.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     uvInfo: {
         alignItems: 'center',
@@ -534,6 +684,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 1,
         marginBottom: SPACING.xs,
+        color: colors.textSecondary,
     },
     uvValue: {
         fontSize: moderateScale(56),
@@ -548,10 +699,13 @@ const styles = StyleSheet.create({
     timerContainer: {
         alignItems: 'center',
         marginBottom: SPACING.xl,
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.xl,
         ...SHADOWS.medium,
+        ...(colors.background === '#121212' ? GLASS.dark : GLASS.default),
+        borderWidth: 0,
+        width: '100%',
     },
     circularTimer: {
         width: moderateScale(200),
@@ -574,12 +728,12 @@ const styles = StyleSheet.create({
     timerTime: {
         fontSize: moderateScale(48),
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: colors.text,
         letterSpacing: -1,
     },
     timerLabel: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginTop: SPACING.xs,
         textTransform: 'uppercase',
         letterSpacing: 1,
@@ -590,12 +744,15 @@ const styles = StyleSheet.create({
         maxWidth: 400, // Constrain max width for tablets
         alignSelf: 'center',
     },
-    startButton: {
-        backgroundColor: COLORS.primary,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.md, // Reduced padding
-        alignItems: 'center',
+    shadowButtonWrapper: {
         ...SHADOWS.button,
+        borderRadius: BORDER_RADIUS.lg,
+    },
+    startButton: {
+        borderRadius: BORDER_RADIUS.lg,
+        padding: SPACING.md,
+        alignItems: 'center',
+        width: '100%',
     },
     activeControls: {
         flexDirection: 'row',
@@ -603,19 +760,19 @@ const styles = StyleSheet.create({
     },
     controlButton: {
         flex: 1,
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md, // Reduced padding
         alignItems: 'center',
         ...SHADOWS.button,
     },
     resetButton: {
-        backgroundColor: COLORS.textSecondary,
+        backgroundColor: colors.textSecondary,
         ...SHADOWS.small,
     },
     buttonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
         fontSize: moderateScale(16),
     },
@@ -626,52 +783,54 @@ const styles = StyleSheet.create({
     },
     toggle: {
         flex: 1,
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md + 2,
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         ...SHADOWS.small,
     },
     toggleActive: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     toggleText: {
         ...TYPOGRAPHY.body,
         fontWeight: '600',
-        color: COLORS.text,
+        color: colors.text,
         fontSize: moderateScale(14),
     },
     toggleTextActive: {
-        color: COLORS.white,
+        color: colors.white,
     },
     infoCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         borderLeftWidth: 5,
-        borderLeftColor: COLORS.primary,
+        borderLeftColor: colors.primary,
         ...SHADOWS.small,
         marginBottom: SPACING.md,
+        ...(colors.background === '#121212' ? GLASS.dark : GLASS.default), // Dynamic Glass
     },
     infoText: {
         ...TYPOGRAPHY.body,
         lineHeight: 24,
+        color: colors.text,
     },
     infoHighlight: {
         fontWeight: 'bold',
-        color: COLORS.primary,
+        color: colors.primary,
         fontSize: moderateScale(18),
     },
     warningBanner: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.xl,
         borderLeftWidth: 5,
-        borderLeftColor: COLORS.primary,
+        borderLeftColor: colors.primary,
         flexDirection: 'row',
         alignItems: 'center',
         ...SHADOWS.small,
@@ -685,13 +844,13 @@ const styles = StyleSheet.create({
     },
     warningTitle: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.text,
+        color: colors.text,
         fontWeight: 'bold',
         marginBottom: SPACING.xs,
     },
     warningText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         lineHeight: 20,
     },
     disclaimer: {
@@ -699,13 +858,13 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.lg,
         padding: SPACING.md,
         alignItems: 'center',
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.md,
     },
     disclaimerText: {
         ...TYPOGRAPHY.caption,
         fontStyle: 'italic',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     // New Styles
     scaleContainer: {
@@ -714,7 +873,7 @@ const styles = StyleSheet.create({
     },
     scaleLabel: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginBottom: SPACING.xs,
         textTransform: 'uppercase',
         letterSpacing: 1,
@@ -739,7 +898,7 @@ const styles = StyleSheet.create({
     scaleItemActive: {
         transform: [{ scale: 1.2 }], // Scale 1.2x
         borderWidth: 3, // Thick border
-        borderColor: '#333333', // Dark Grey/Black border
+        borderColor: colors.text, // Dynamic border color
         ...SHADOWS.medium,
         zIndex: 10,
     },
@@ -752,7 +911,7 @@ const styles = StyleSheet.create({
         fontSize: moderateScale(13),
     },
     riskLegendCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.md,
@@ -762,7 +921,7 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.subheading,
         fontWeight: 'bold',
         marginBottom: SPACING.md,
-        color: COLORS.text,
+        color: colors.text,
     },
     riskList: {
         gap: SPACING.sm,
@@ -784,7 +943,7 @@ const styles = StyleSheet.create({
     },
     riskRange: {
         ...TYPOGRAPHY.body,
-        color: COLORS.text,
+        color: colors.text,
         fontWeight: '600',
         width: moderateScale(50),
     },

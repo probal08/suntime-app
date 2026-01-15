@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+// Re-enabled for SDK 52+
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,21 +8,24 @@ const KEYS = {
     AUTH_USERNAME: 'auth_username',
     AUTH_PASSWORD: 'auth_password',
     AUTH_BIOMETRIC_ENABLED: 'auth_biometric_enabled',
+    AUTH_SECURITY_QUESTION: 'auth_security_question',
+    AUTH_SECURITY_ANSWER: 'auth_security_answer',
     LOGGED_OUT: 'logged_out', // Simple flag for logout state
 };
 
 /**
- * Secure storage for mobile (uses SecureStore)
+ * Storage for Expo Go (uses AsyncStorage instead of SecureStore)
+ * Note: In production, use SecureStore for better security
  */
 const secureStorage = {
     setItem: async (key, value) => {
-        return SecureStore.setItemAsync(key, value);
+        return AsyncStorage.setItem(key, value);
     },
     getItem: async (key) => {
-        return SecureStore.getItemAsync(key);
+        return AsyncStorage.getItem(key);
     },
     deleteItem: async (key) => {
-        return SecureStore.deleteItemAsync(key);
+        return AsyncStorage.removeItem(key);
     },
 };
 
@@ -45,13 +48,22 @@ export const hashPassword = async (password) => {
 /**
  * Save user credentials
  */
-export const saveCredentials = async (username, password, enableBiometric = false) => {
+/**
+ * Save user credentials with security question
+ */
+export const saveCredentials = async (username, password, enableBiometric = false, securityQuestion = '', securityAnswer = '') => {
     try {
         const hashedPassword = await hashPassword(password);
 
         await secureStorage.setItem(KEYS.AUTH_USERNAME, username);
         await secureStorage.setItem(KEYS.AUTH_PASSWORD, hashedPassword);
         await secureStorage.setItem(KEYS.AUTH_BIOMETRIC_ENABLED, enableBiometric.toString());
+
+        if (securityQuestion && securityAnswer) {
+            const hashedAnswer = await hashPassword(securityAnswer.toLowerCase().trim());
+            await secureStorage.setItem(KEYS.AUTH_SECURITY_QUESTION, securityQuestion);
+            await secureStorage.setItem(KEYS.AUTH_SECURITY_ANSWER, hashedAnswer);
+        }
 
         // Clear logged out flag when registering
         await AsyncStorage.removeItem(KEYS.LOGGED_OUT);
@@ -84,6 +96,22 @@ export const verifyPassword = async (password) => {
         return isValid;
     } catch (error) {
         console.error('Error verifying password:', error);
+        return false;
+    }
+};
+
+/**
+ * Get username
+ */
+/**
+ * Update username
+ */
+export const updateUsername = async (newUsername) => {
+    try {
+        await secureStorage.setItem(KEYS.AUTH_USERNAME, newUsername);
+        return true;
+    } catch (error) {
+        console.error('Error updating username:', error);
         return false;
     }
 };
@@ -149,6 +177,8 @@ export const deleteAccount = async () => {
         await secureStorage.deleteItem(KEYS.AUTH_USERNAME);
         await secureStorage.deleteItem(KEYS.AUTH_PASSWORD);
         await secureStorage.deleteItem(KEYS.AUTH_BIOMETRIC_ENABLED);
+        await secureStorage.deleteItem(KEYS.AUTH_SECURITY_QUESTION);
+        await secureStorage.deleteItem(KEYS.AUTH_SECURITY_ANSWER);
         await AsyncStorage.removeItem(KEYS.LOGGED_OUT);
         console.log('✅ Account deleted (credentials removed)');
         return true;
@@ -159,7 +189,7 @@ export const deleteAccount = async () => {
 };
 
 /**
- * Biometric Authentication
+ * Biometric Authentication - DISABLED for Expo Go compatibility
  */
 export const checkBiometricAvailable = async () => {
     try {
@@ -252,5 +282,44 @@ export const setAppLockEnabled = async (enabled) => {
         }
     } catch (error) {
         console.error('Error setting app lock:', error);
+        console.error('Error setting app lock:', error);
+    }
+};
+
+/**
+ * RECOVERY FUNCTIONS
+ */
+
+export const getSecurityQuestion = async () => {
+    try {
+        return await secureStorage.getItem(KEYS.AUTH_SECURITY_QUESTION);
+    } catch (error) {
+        console.error('Error getting security question:', error);
+        return null;
+    }
+};
+
+export const verifySecurityAnswer = async (answer) => {
+    try {
+        const storedHash = await secureStorage.getItem(KEYS.AUTH_SECURITY_ANSWER);
+        if (!storedHash) return false;
+
+        const inputHash = await hashPassword(answer.toLowerCase().trim());
+        return inputHash === storedHash;
+    } catch (error) {
+        console.error('Error verification security answer:', error);
+        return false;
+    }
+};
+
+export const resetPassword = async (newPassword) => {
+    try {
+        const hashedPassword = await hashPassword(newPassword);
+        await secureStorage.setItem(KEYS.AUTH_PASSWORD, hashedPassword);
+        // Clear logged out flag to allow immediate login if desired, or let them login manually
+        return true;
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        return false;
     }
 };

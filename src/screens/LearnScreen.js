@@ -6,12 +6,19 @@ import {
     ScrollView,
     TouchableOpacity,
     TextInput,
+
     Platform
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../constants/theme';
-import { Sun, AlertTriangle, BarChart2, Users, Shield, Cloud, CheckCircle, Microscope, Landmark, GraduationCap, Search, X } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
+import { SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GRADIENTS, GLASS } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Sun, AlertTriangle, BarChart2, Users, Shield, Cloud, CheckCircle, Microscope, Landmark, GraduationCap, Search, X, ArrowLeft, MoreVertical } from 'lucide-react-native';
+import MenuDrawer from '../components/MenuDrawer';
+import { getUsername } from '../utils/auth';
+import { getProfileImage } from '../utils/storage';
 
 const IconMap = {
     '1': Sun,
@@ -409,8 +416,26 @@ Aim for the sweet spot: enough vitamin D, minimal skin cancer risk`
 ];
 
 export default function LearnScreen() {
+    const navigation = useNavigation();
+    const { colors, isDark } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors), [colors]);
+
     const [expandedId, setExpandedId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [username, setUsername] = useState('User');
+    const [profileImage, setProfileImage] = useState(null);
+
+    React.useEffect(() => {
+        loadMenuData();
+    }, []);
+
+    const loadMenuData = async () => {
+        const user = await getUsername();
+        if (user) setUsername(user);
+        const img = await getProfileImage();
+        if (img) setProfileImage(img);
+    };
 
     const filteredSections = LEARN_SECTIONS.filter(section =>
         section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -419,6 +444,13 @@ export default function LearnScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <LinearGradient
+                colors={isDark ? GRADIENTS.night : GRADIENTS.sunrise}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                opacity={isDark ? 0.8 : 0.3}
+            />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -429,6 +461,20 @@ export default function LearnScreen() {
                     entering={FadeInDown}
                     style={styles.header}
                 >
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Home')}
+                            style={styles.backButton}
+                        >
+                            <ArrowLeft color={colors.text} size={24} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setIsMenuOpen(true)}
+                            style={{ padding: SPACING.sm }}
+                        >
+                            <MoreVertical size={moderateScale(24)} color={colors.text} />
+                        </TouchableOpacity>
+                    </View>
                     <Text style={styles.title}>Learn About Sun Safety</Text>
                     <Text style={styles.subtitle}>
                         Tap any topic to learn more
@@ -440,18 +486,18 @@ export default function LearnScreen() {
                     entering={FadeInDown}
                     style={styles.searchContainer}
                 >
-                    <Search color={COLORS.textSecondary} size={20} style={styles.searchIcon} />
+                    <Search color={colors.textSecondary} size={20} style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Search topics..."
-                        placeholderTextColor={COLORS.textSecondary}
+                        placeholderTextColor={colors.textSecondary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         clearButtonMode="while-editing"
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <X color={COLORS.textSecondary} size={20} />
+                            <X color={colors.textSecondary} size={20} />
                         </TouchableOpacity>
                     )}
                 </Animated.View>
@@ -477,7 +523,7 @@ export default function LearnScreen() {
                             >
                                 {(() => {
                                     const IconComponent = IconMap[section.id.toString()];
-                                    return <IconComponent color={COLORS.primary} size={moderateScale(24)} style={{ marginRight: SPACING.md }} />;
+                                    return <IconComponent color={colors.primary} size={moderateScale(24)} style={{ marginRight: SPACING.md }} />;
                                 })()}
                                 <Text style={styles.accordionTitle}>{section.title}</Text>
                                 <Text style={styles.accordionArrow}>
@@ -517,44 +563,66 @@ export default function LearnScreen() {
                     </Text>
                 </View>
             </ScrollView>
+
+            <MenuDrawer
+                isVisible={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                navigation={navigation}
+                username={username}
+                profileImage={profileImage}
+                onLogout={async () => {
+                }}
+            />
         </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
         paddingBottom: SPACING.xxl,
     },
     header: {
-        marginBottom: SPACING.xl,
-        paddingTop: SPACING.md,
+        marginBottom: SPACING.lg,
+        paddingTop: SPACING.xs,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: SPACING.sm,
+    },
+    backButton: {
+        marginRight: SPACING.sm,
+        padding: SPACING.xs,
     },
     title: {
         ...TYPOGRAPHY.title,
         fontSize: moderateScale(32),
-        marginBottom: SPACING.xs,
+        color: colors.text,
+        marginTop: SPACING.xs,
     },
     subtitle: {
         ...TYPOGRAPHY.body,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         lineHeight: 24,
+        marginTop: SPACING.xs,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         paddingHorizontal: SPACING.md,
         paddingVertical: Platform.OS === 'ios' ? SPACING.md : SPACING.sm,
         marginBottom: SPACING.xl,
         ...SHADOWS.small,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        ...(colors.background === '#121212' ? GLASS.dark : GLASS.default),
+        borderWidth: 0,
     },
     searchIcon: {
         marginRight: SPACING.sm,
@@ -563,7 +631,7 @@ const styles = StyleSheet.create({
         flex: 1,
         ...TYPOGRAPHY.body,
         fontSize: moderateScale(16),
-        color: COLORS.text,
+        color: colors.text,
         padding: 0, // Remove default padding for centered look
     },
     emptySearch: {
@@ -572,26 +640,28 @@ const styles = StyleSheet.create({
     },
     emptySearchText: {
         ...TYPOGRAPHY.body,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         textAlign: 'center',
     },
     accordionItem: {
         marginBottom: SPACING.md,
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         overflow: 'hidden',
         ...SHADOWS.small,
+        ...(colors.background === '#121212' ? GLASS.dark : GLASS.default),
+        borderWidth: 0,
     },
     accordionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: SPACING.lg,
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
     },
     accordionHeaderExpanded: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        borderBottomColor: colors.border,
     },
     accordionIcon: {
         fontSize: moderateScale(28),
@@ -601,45 +671,45 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.heading,
         fontSize: moderateScale(18),
         flex: 1,
-        color: COLORS.text,
+        color: colors.text,
     },
     accordionArrow: {
         fontSize: 16,
-        color: COLORS.primary,
+        color: colors.primary,
         fontWeight: 'bold',
     },
     accordionContent: {
         padding: SPACING.lg,
-        backgroundColor: COLORS.white,
+        backgroundColor: colors.white,
     },
     accordionText: {
         ...TYPOGRAPHY.body,
         lineHeight: 24,
-        color: COLORS.text,
+        color: colors.text,
     },
     disclaimer: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.md,
         padding: SPACING.lg,
         marginTop: SPACING.xl,
         borderLeftWidth: 4,
-        borderLeftColor: COLORS.warning,
+        borderLeftColor: colors.warning,
     },
     disclaimerText: {
         ...TYPOGRAPHY.caption,
         fontStyle: 'italic',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         lineHeight: 20,
     },
     references: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.md,
         padding: SPACING.md,
         marginTop: SPACING.lg,
     },
     referencesText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         lineHeight: 18,
         fontStyle: 'italic',
     },

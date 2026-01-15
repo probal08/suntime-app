@@ -38,11 +38,12 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Suntime to use your location to fetch UV data."
         }
       ],
-      "expo-secure-store"
+      "expo-notifications",
+      "expo-local-authentication"
     ],
     "extra": {
       "eas": {
-        "projectId": "489aeb4e-e237-4c78-88fa-ff40cea44168"
+        "projectId": "9845eef7-e781-4911-88dd-8af09a1f1a09"
       }
     }
   }

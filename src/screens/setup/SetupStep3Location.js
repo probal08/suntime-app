@@ -14,11 +14,14 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown, FadeInRight, FadeInUp } from 'react-native-reanimated';
 import * as Location from 'expo-location';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
 import { MapPin, Edit2, CloudSun, Check, AlertTriangle, BookOpen } from 'lucide-react-native';
 import { setManualUV } from '../../utils/storage';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function SetupStep3Location({ navigation }) {
+    const { colors, isDark } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
     const [mode, setMode] = useState('gps'); // 'gps' or 'manual'
     const [permissionGranted, setPermissionGranted] = useState(null);
     const [isRequesting, setIsRequesting] = useState(false);
@@ -112,7 +115,7 @@ export default function SetupStep3Location({ navigation }) {
                         entering={FadeInDown}
                         style={styles.header}
                     >
-                        <CloudSun color={COLORS.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
+                        <CloudSun color={colors.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
                         <Text style={styles.title}>UV Data Source</Text>
                         <Text style={styles.subtitle}>
                             Choose how to get UV Index data
@@ -128,7 +131,7 @@ export default function SetupStep3Location({ navigation }) {
                             style={[styles.modeButton, mode === 'gps' && styles.modeButtonActive]}
                             onPress={() => setMode('gps')}
                         >
-                            <MapPin color={mode === 'gps' ? COLORS.primary : COLORS.textSecondary} size={32} style={{ marginBottom: SPACING.sm }} />
+                            <MapPin color={mode === 'gps' ? colors.primary : colors.textSecondary} size={32} style={{ marginBottom: SPACING.sm }} />
                             <Text style={[styles.modeText, mode === 'gps' && styles.modeTextActive]}>
                                 GPS Location
                             </Text>
@@ -139,7 +142,7 @@ export default function SetupStep3Location({ navigation }) {
                             style={[styles.modeButton, mode === 'manual' && styles.modeButtonActive]}
                             onPress={() => setMode('manual')}
                         >
-                            <Edit2 color={mode === 'manual' ? COLORS.primary : COLORS.textSecondary} size={32} style={{ marginBottom: SPACING.sm }} />
+                            <Edit2 color={mode === 'manual' ? colors.primary : colors.textSecondary} size={32} style={{ marginBottom: SPACING.sm }} />
                             <Text style={[styles.modeText, mode === 'manual' && styles.modeTextActive]}>
                                 Manual UV
                             </Text>
@@ -215,7 +218,7 @@ export default function SetupStep3Location({ navigation }) {
                                 {/* UV Guide Link */}
                                 <TouchableOpacity style={styles.guideCard} onPress={handleOpenUVGuide}>
                                     <View style={styles.guideContent}>
-                                        <BookOpen color={COLORS.primary} size={28} style={{ marginRight: SPACING.md }} />
+                                        <BookOpen color={colors.primary} size={28} style={{ marginRight: SPACING.md }} />
                                         <View style={styles.guideTextContainer}>
                                             <Text style={styles.guideTitle}>What is UV Index?</Text>
                                             <Text style={styles.guideDescription}>
@@ -232,7 +235,7 @@ export default function SetupStep3Location({ navigation }) {
                                     <TextInput
                                         style={styles.input}
                                         placeholder="e.g. 5"
-                                        placeholderTextColor={COLORS.textSecondary}
+                                        placeholderTextColor={colors.textSecondary}
                                         value={manualUV}
                                         onChangeText={setManualUVValue}
                                         keyboardType="numeric"
@@ -253,7 +256,7 @@ export default function SetupStep3Location({ navigation }) {
                         disabled={!canContinue()}
                     >
                         <Text style={styles.continueButtonText}>
-                            Continue →
+                            Continue
                         </Text>
                     </TouchableOpacity>
                 </ScrollView>
@@ -262,10 +265,10 @@ export default function SetupStep3Location({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
@@ -276,17 +279,17 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: moderateScale(6),
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.full,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     progressText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginTop: SPACING.xs,
         textAlign: 'center',
     },
@@ -302,11 +305,12 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.title,
         textAlign: 'center',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     subtitle: {
         ...TYPOGRAPHY.body,
         textAlign: 'center',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         paddingHorizontal: SPACING.md,
     },
     modeContainer: {
@@ -316,17 +320,18 @@ const styles = StyleSheet.create({
     },
     modeButton: {
         flex: 1,
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     modeButtonActive: {
-        borderColor: COLORS.primary,
-        backgroundColor: COLORS.backgroundLight,
+        borderColor: colors.primary,
+        backgroundColor: colors.backgroundLight,
     },
     modeEmoji: {
         fontSize: 32,
@@ -335,41 +340,45 @@ const styles = StyleSheet.create({
     modeText: {
         ...TYPOGRAPHY.subheading,
         fontWeight: '600',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginBottom: SPACING.xs,
     },
     modeTextActive: {
-        color: COLORS.primary,
+        color: colors.primary,
     },
     modeDescription: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     infoCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.lg,
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     infoTitle: {
         ...TYPOGRAPHY.subheading,
         fontWeight: '600',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     infoText: {
         ...TYPOGRAPHY.body,
         lineHeight: 22,
         marginBottom: SPACING.xs,
+        color: colors.text,
     },
     guideCard: {
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.lg,
         borderLeftWidth: 4,
-        borderLeftColor: COLORS.primary,
+        borderLeftColor: colors.primary,
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     guideContent: {
         flexDirection: 'row',
@@ -390,23 +399,25 @@ const styles = StyleSheet.create({
     },
     guideDescription: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     guideLinkIcon: {
         fontSize: 24,
-        color: COLORS.primary,
+        color: colors.primary,
     },
     uvReferenceCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.lg,
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     uvReferenceTitle: {
         ...TYPOGRAPHY.subheading,
         fontWeight: '600',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     uvReferenceRow: {
         flexDirection: 'row',
@@ -420,7 +431,7 @@ const styles = StyleSheet.create({
     },
     uvLevelText: {
         ...TYPOGRAPHY.body,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     inputContainer: {
         marginBottom: SPACING.lg,
@@ -429,26 +440,28 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.body,
         fontWeight: '600',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     input: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md,
         ...TYPOGRAPHY.body,
         borderWidth: 2,
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
         fontSize: moderateScale(20),
         textAlign: 'center',
         ...SHADOWS.small,
+        color: colors.text,
     },
     inputHint: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginTop: SPACING.xs,
         textAlign: 'center',
     },
     primaryButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md + 2,
         alignItems: 'center',
@@ -457,7 +470,7 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
     },
     successCard: {
@@ -502,7 +515,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     continueButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md + 2,
         alignItems: 'center',
@@ -513,7 +526,7 @@ const styles = StyleSheet.create({
     },
     continueButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
     },
 });

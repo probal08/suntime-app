@@ -5,6 +5,7 @@ import { LogBox, View, Text } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ThemeProvider } from './src/context/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Keep the splash screen visible while we fetch resources
@@ -34,8 +35,6 @@ function App() {
 
     const requestNotificationPermissions = async () => {
         try {
-            // Notifications are not supported in Expo Go with SDK 53+
-            // We still try to request permissions but catch failures gracefully
             const { status: existingStatus } = await Notifications.getPermissionsAsync();
             let finalStatus = existingStatus;
 
@@ -48,7 +47,7 @@ function App() {
                 console.log('Notification permission not granted');
             }
         } catch (error) {
-            console.log('Notifications not supported/error:', error.message);
+            console.log('Notifications error:', error.message);
         }
     };
 
@@ -57,9 +56,11 @@ function App() {
     }, []);
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <AppNavigator />
-        </GestureHandlerRootView>
+        <ThemeProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <AppNavigator />
+            </GestureHandlerRootView>
+        </ThemeProvider>
     );
 }
 

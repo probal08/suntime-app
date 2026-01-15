@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions, LayoutA
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sun, Activity, BarChart2, User } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
 import { COLORS, SHADOWS, moderateScale } from '../constants/theme';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -17,7 +18,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
-const TabItem = ({ isFocused, options, onPress, onLongPress, Icon, label }) => {
+const TabItem = ({ isFocused, options, onPress, onLongPress, Icon, label, colors, styles }) => {
     return (
         <TouchableOpacity
             accessibilityRole="button"
@@ -30,13 +31,13 @@ const TabItem = ({ isFocused, options, onPress, onLongPress, Icon, label }) => {
             <View style={[styles.contentContainer, isFocused && styles.contentActive]}>
                 <Icon
                     size={22}
-                    color={isFocused ? COLORS.primary : '#999999'}
+                    color={isFocused ? colors.primary : colors.textSecondary}
                     strokeWidth={isFocused ? 2.5 : 2}
                 />
                 {isFocused && (
                     <Text
                         numberOfLines={1}
-                        style={[styles.tabLabel, { color: COLORS.primary }]}
+                        style={[styles.tabLabel, { color: colors.primary }]}
                     >
                         {label}
                     </Text>
@@ -46,7 +47,7 @@ const TabItem = ({ isFocused, options, onPress, onLongPress, Icon, label }) => {
     );
 };
 
-const CustomTabBar = ({ state, descriptors, navigation }) => {
+const CustomTabBar = ({ state, descriptors, navigation, colors, styles }) => {
     const insets = useSafeAreaInsets();
 
     return (
@@ -94,6 +95,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                             onLongPress={onLongPress}
                             Icon={Icon}
                             label={label}
+                            colors={colors}
+                            styles={styles}
                         />
                     );
                 })}
@@ -103,9 +106,14 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 };
 
 export default function TabNavigator() {
+    const { colors } = useTheme();
+    // We need styles inside the component or passed down?
+    // Actually, create styles here.
+    const styles = React.useMemo(() => getStyles(colors), [colors]);
+
     return (
         <Tab.Navigator
-            tabBar={props => <CustomTabBar {...props} />}
+            tabBar={props => <CustomTabBar {...props} colors={colors} styles={styles} />}
             screenOptions={{
                 headerShown: false,
             }}
@@ -122,7 +130,7 @@ export default function TabNavigator() {
                 name="Activities"
                 component={LearnScreen} // Renamed Learn to Activities/Plans
                 options={{
-                    tabBarLabel: 'Plans',
+                    tabBarLabel: 'Learn',
                     tabBarIcon: ({ color, size, strokeWidth }) => <Activity color={color} size={size} strokeWidth={strokeWidth} />,
                 }}
             />
@@ -147,22 +155,22 @@ export default function TabNavigator() {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
     placeholderContainer: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
     },
     placeholderText: {
-        ...COLORS.heading,
+        color: colors.primary,
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 8,
     },
     placeholderSubText: {
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
     },
     tabBarContainer: {
         position: 'absolute',
@@ -170,19 +178,19 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         alignItems: 'center',
-        backgroundColor: 'transparent', // Transparent container for floating effect
+        backgroundColor: 'transparent',
     },
     tabBar: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.cardBackground,
         width: '94%',
-        borderRadius: 40, // Pill shape
+        borderRadius: 40,
         height: 65,
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 8,
         ...SHADOWS.medium,
-        shadowColor: '#000',
+        shadowColor: colors.text, // Subtle shadow adjustment?
         shadowOpacity: 0.1,
         shadowRadius: 10,
         elevation: 8,
@@ -194,7 +202,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     tabItemActive: {
-        flex: 1.8, // Grow active item
+        flex: 1.8,
     },
     contentContainer: {
         flexDirection: 'row',
@@ -205,7 +213,7 @@ const styles = StyleSheet.create({
         borderRadius: 30,
     },
     contentActive: {
-        backgroundColor: '#F5F5F7', // Soft highlight
+        backgroundColor: colors.backgroundLight,
         gap: 8,
     },
     tabLabel: {

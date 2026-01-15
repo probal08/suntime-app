@@ -10,10 +10,11 @@ import {
     Platform
 } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale } from '../../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
 import { User } from 'lucide-react-native';
 import { setOnboarded } from '../../utils/storage';
 import { getSkinTypeDescription } from '../../utils/sunLogic';
+import { useTheme } from '../../context/ThemeContext';
 
 const SKIN_TYPES = [1, 2, 3, 4, 5, 6];
 
@@ -27,6 +28,8 @@ const SKIN_TYPE_COLORS = {
 };
 
 export default function SetupStep1SkinType({ navigation }) {
+    const { colors, isDark } = useTheme();
+    const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
     const [selectedType, setSelectedType] = useState(null);
 
     const handleContinue = async () => {
@@ -66,7 +69,7 @@ export default function SetupStep1SkinType({ navigation }) {
                     entering={FadeInDown}
                     style={styles.header}
                 >
-                    <User color={COLORS.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
+                    <User color={colors.primary} size={moderateScale(64)} style={{ marginBottom: SPACING.md }} />
                     <Text style={styles.title}>Select Your Skin Type</Text>
                     <Text style={styles.subtitle}>
                         Based on the Fitzpatrick Scale. This helps us calculate safe sun exposure times.
@@ -113,7 +116,7 @@ export default function SetupStep1SkinType({ navigation }) {
                     disabled={!selectedType}
                 >
                     <Text style={styles.continueButtonText}>
-                        Continue →
+                        Continue
                     </Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -121,10 +124,10 @@ export default function SetupStep1SkinType({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: colors.background,
     },
     scrollContent: {
         padding: SPACING.lg,
@@ -135,17 +138,17 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: moderateScale(6),
-        backgroundColor: COLORS.backgroundLight,
+        backgroundColor: colors.backgroundLight,
         borderRadius: BORDER_RADIUS.full,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
     },
     progressText: {
         ...TYPOGRAPHY.caption,
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         marginTop: SPACING.xs,
         textAlign: 'center',
     },
@@ -161,11 +164,12 @@ const styles = StyleSheet.create({
         ...TYPOGRAPHY.title,
         textAlign: 'center',
         marginBottom: SPACING.sm,
+        color: colors.text,
     },
     subtitle: {
         ...TYPOGRAPHY.body,
         textAlign: 'center',
-        color: COLORS.textSecondary,
+        color: colors.textSecondary,
         paddingHorizontal: SPACING.md,
         lineHeight: moderateScale(24),
     },
@@ -173,16 +177,17 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.xl,
     },
     typeCard: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: colors.cardBackground,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         marginBottom: SPACING.md,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
         ...SHADOWS.small,
+        ...(isDark ? GLASS.dark : GLASS.default),
     },
     typeCardSelected: {
-        borderColor: COLORS.primary,
+        borderColor: colors.primary,
         borderWidth: 3,
         ...SHADOWS.medium,
     },
@@ -196,19 +201,20 @@ const styles = StyleSheet.create({
         borderRadius: BORDER_RADIUS.full,
         marginRight: SPACING.md,
         borderWidth: 2,
-        borderColor: COLORS.border,
+        borderColor: colors.border,
     },
     typeTitle: {
         ...TYPOGRAPHY.subheading,
         flex: 1,
         fontWeight: '600',
+        color: colors.text,
     },
     checkmark: {
         fontSize: moderateScale(28),
-        color: COLORS.primary,
+        color: colors.primary,
     },
     continueButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: colors.primary,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md + 2,
         alignItems: 'center',
@@ -219,7 +225,7 @@ const styles = StyleSheet.create({
     },
     continueButtonText: {
         ...TYPOGRAPHY.subheading,
-        color: COLORS.white,
+        color: colors.white,
         fontWeight: '600',
     },
 });

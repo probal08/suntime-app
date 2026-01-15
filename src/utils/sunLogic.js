@@ -53,8 +53,9 @@ export const calculateSafeTime = (uvIndex, skinType, isCloudy = false, hasSunscr
 
     const safeTime = baseTime * skinMultiplier * environmentFactor;
 
-    // Ensure minimum of 2 minutes and maximum of 90 minutes
-    const clampedTime = Math.max(2, Math.min(90, Math.round(safeTime)));
+    // Ensure minimum of 2 minutes and maximum of 300 minutes (5 hours)
+    // Darker skin types need higher limits, otherwise modifiers (clouds/SPF) won't show changes
+    const clampedTime = Math.max(2, Math.min(300, Math.round(safeTime)));
 
     console.log('Safe Time Calculation:', {
         uvIndex,
@@ -90,16 +91,16 @@ export const getSkinTypeDescription = (skinType) => {
  * Get UV level category
  */
 export const getUVCategory = (uvIndex) => {
-    if (uvIndex >= 0 && uvIndex <= 2) {
+    if (uvIndex < 3) {
         return { level: 'Low', color: '#4CAF50' };
     }
-    if (uvIndex >= 3 && uvIndex <= 5) {
+    if (uvIndex >= 3 && uvIndex < 6) {
         return { level: 'Moderate', color: '#FFB800' };
     }
-    if (uvIndex >= 6 && uvIndex <= 7) {
+    if (uvIndex >= 6 && uvIndex < 8) {
         return { level: 'High', color: '#FF9800' };
     }
-    if (uvIndex >= 8 && uvIndex <= 10) {
+    if (uvIndex >= 8 && uvIndex < 11) {
         return { level: 'Very High', color: '#FF5722' };
     }
     if (uvIndex >= 11) {
