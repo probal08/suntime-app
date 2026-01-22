@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
-import { Shield, Check, Sun } from 'lucide-react-native';
+import { Shield, Check, Sun, ArrowLeft } from 'lucide-react-native';
 import { saveDefaultPreferences } from '../../utils/localStorage';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -59,12 +59,19 @@ export default function SetupStep2Sunscreen({ navigation }) {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={{ marginBottom: SPACING.md, alignSelf: 'flex-start' }}
+                >
+                    <ArrowLeft color={colors.text} size={24} />
+                </TouchableOpacity>
+
                 {/* Progress Indicator */}
                 <View style={styles.progressContainer}>
                     <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: '50%' }]} />
+                        <View style={[styles.progressFill, { width: '33%' }]} />
                     </View>
-                    <Text style={styles.progressText}>Step 2 of 4</Text>
+                    <Text style={styles.progressText}>Step 2 of 6</Text>
                 </View>
 
                 {/* Header */}

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight, FadeInUp } from 'react-native-reanimated';
 import * as Location from 'expo-location';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
-import { MapPin, Edit2, CloudSun, Check, AlertTriangle, BookOpen } from 'lucide-react-native';
+import { MapPin, Edit2, CloudSun, Check, AlertTriangle, BookOpen, ArrowLeft } from 'lucide-react-native';
 import { setManualUV, getDefaultPreferences, saveDefaultPreferences } from '../../utils/localStorage';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -124,12 +124,19 @@ export default function SetupStep3Location({ navigation }) {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={{ marginBottom: SPACING.md, alignSelf: 'flex-start' }}
+                    >
+                        <ArrowLeft color={colors.text} size={24} />
+                    </TouchableOpacity>
+
                     {/* Progress Indicator */}
                     <View style={styles.progressContainer}>
                         <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: '75%' }]} />
+                            <View style={[styles.progressFill, { width: '50%' }]} />
                         </View>
-                        <Text style={styles.progressText}>Step 3 of 4</Text>
+                        <Text style={styles.progressText}>Step 3 of 6</Text>
                     </View>
 
                     {/* Header */}
@@ -327,6 +334,7 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         textAlign: 'center',
         color: colors.textSecondary,
         paddingHorizontal: SPACING.md,
+        lineHeight: moderateScale(24),
     },
     modeContainer: {
         flexDirection: 'row',

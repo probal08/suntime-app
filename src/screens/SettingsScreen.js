@@ -43,7 +43,7 @@ import StandardButton from '../components/common/StandardButton';
 
 export default function SettingsScreen({ navigation }) {
     const { colors, isDark, toggleTheme } = useTheme();
-    const { signOut, user } = useAuth();
+    const { signOut, user, refreshProfile } = useAuth();
 
     // Dynamic Styles
     const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
@@ -65,6 +65,7 @@ export default function SettingsScreen({ navigation }) {
     }, []);
 
     // Handle Logout with Firebase
+    // Handle Logout with Firebase
     const handleLogout = () => {
         Alert.alert(
             'Logout',
@@ -77,7 +78,7 @@ export default function SettingsScreen({ navigation }) {
                     onPress: async () => {
                         try {
                             await signOut();
-                            navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
+                            // Navigation handles reset automatically via AuthContext
                         } catch (error) {
                             Alert.alert('Error', 'Logout failed: ' + error.message);
                         }
@@ -162,9 +163,9 @@ export default function SettingsScreen({ navigation }) {
                                     location: null,
                                     lastSessionDate: null // Reset daily limit
                                 });
+                                // Refresh profile to trigger AppNavigator switch to Setup
+                                await refreshProfile();
                             }
-
-                            navigation.reset({ index: 0, routes: [{ name: 'SetupStep1' }] });
                         } catch (error) {
                             Alert.alert('Error', 'Reset failed: ' + error.message);
                         }
@@ -188,7 +189,6 @@ export default function SettingsScreen({ navigation }) {
                             await resetAllData();
                             await deleteAccountAuth();
                             Alert.alert('Success', 'Account deleted.');
-                            navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
                         } catch (error) {
                             Alert.alert('Error', 'Delete failed: ' + error.message);
                         }
@@ -203,7 +203,7 @@ export default function SettingsScreen({ navigation }) {
             if (!isRegistered) {
                 Alert.alert('Setup Required', 'You need to create an account first.', [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Create Account', onPress: async () => { await setAppLockEnabled(true); navigation.reset({ index: 0, routes: [{ name: 'Auth' }] }); } }
+                    { text: 'Create Account', onPress: async () => { await setAppLockEnabled(true); /* Logic to prompt auth? */ } }
                 ]);
                 return;
             }

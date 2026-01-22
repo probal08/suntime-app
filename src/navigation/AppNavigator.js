@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { AppState, View } from 'react-native';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -15,6 +15,7 @@ import SetupStep1SkinType from '../screens/setup/SetupStep1SkinType';
 import SetupStep2Sunscreen from '../screens/setup/SetupStep2Sunscreen';
 import SetupStep3Location from '../screens/setup/SetupStep3Location';
 import SetupStepVitaminD from '../screens/setup/SetupStepVitaminD';
+import SetupStepPrescription from '../screens/setup/SetupStepPrescription';
 import SetupStep4Disclaimer from '../screens/setup/SetupStep4Disclaimer';
 
 // Skin Scanner Screen
@@ -30,30 +31,14 @@ const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
     const { colors, isDark } = useTheme();
-    const { user, initializing, isAuthenticated, userProfile } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [initialRoute, setInitialRoute] = useState('Auth');
+    // Use 'loading' from AuthContext to determine if we are in the middle of a login/fetch
+    const { user, initializing, isAuthenticated, userProfile, loading } = useAuth();
     const navigationRef = useNavigationContainerRef();
 
-    // App Lock Listener
+    // App Lock Listener Logic
     const lastBackgroundTime = React.useRef(Date.now());
 
-    useEffect(() => {
-        if (!initializing) {
-            checkAppState();
-        }
-
-        // When user logs out (isAuthenticated becomes false), reset to Auth
-        if (!initializing && !isAuthenticated && navigationRef.isReady()) {
-            setInitialRoute('Auth');
-            navigationRef.reset({
-                index: 0,
-                routes: [{ name: 'Auth' }],
-            });
-        }
-    }, [initializing, isAuthenticated, userProfile]);
-
-    useEffect(() => {
+    React.useEffect(() => {
         const subscription = AppState.addEventListener('change', async (nextAppState) => {
             if (nextAppState === 'background' || nextAppState === 'inactive') {
                 lastBackgroundTime.current = Date.now();
@@ -61,7 +46,7 @@ export default function AppNavigator() {
                 const now = Date.now();
                 const timeInBackground = now - lastBackgroundTime.current;
 
-                // Grace period of 5 seconds (to allow Share/Permissions dialogs)
+                // Grace period of 5 seconds
                 if (timeInBackground < 5000) {
                     return;
                 }
@@ -69,10 +54,8 @@ export default function AppNavigator() {
                 const locked = await isAppLockEnabled();
                 if (locked && navigationRef.isReady() && !isAuthenticated) {
                     // Navigate to Auth screen only if not authenticated
-                    navigationRef.reset({
-                        index: 0,
-                        routes: [{ name: 'Auth' }],
-                    });
+                    // With conditional rendering, this might be redundant if isAuthenticated is false
+                    // but keeping for explicit lock check logic
                 }
             }
         });
@@ -82,53 +65,15 @@ export default function AppNavigator() {
         };
     }, [isAuthenticated]);
 
-    const checkAppState = async () => {
-        try {
-            if (isAuthenticated && user) {
-                // User is logged in via Firebase
-                // Check setupCompleted AND skinType existence for strict validation
-                // This is the SINGLE SOURCE OF TRUTH
-                let hasSkinType = userProfile?.skinType !== undefined && userProfile?.skinType !== null;
-                const completedFlag = userProfile?.setupCompleted === true;
+    // Derived State for Validation
+    // Check if setup is truly complete (flag + critical data existence)
+    const hasSkinType = userProfile?.skinType !== undefined && userProfile?.skinType !== null;
+    const completedFlag = userProfile?.setupCompleted === true;
 
-                // Auto-repair: If setup is marked complete but skinType is missing, default to 3
-                if (completedFlag && !hasSkinType) {
-                    console.log('⚠️ Profile corrupted: Setup complete but missing skinType. Auto-repairing to Type 3.');
-                    hasSkinType = true;
-                    // We don't block navigation for this fix, we assume Type 3 temporarily
-                    // ideally we should trigger a background save here but we can rely on settings to fix it later
-                }
+    // Auto-repair logic can be done in a useEffect, but for rendering decision we use this:
+    const isSetupComplete = completedFlag && hasSkinType;
 
-                const setupDone = completedFlag && hasSkinType;
-
-                console.log('📱 Auth State Check:', {
-                    userId: user.uid,
-                    hasProfile: !!userProfile,
-                    setupCompleted: userProfile?.setupCompleted,
-                    hasSkinType: hasSkinType,
-                    FINAL_DECISION: setupDone ? 'Home' : 'Setup'
-                });
-
-                if (setupDone) {
-                    // Setup is complete - go directly to main app
-                    setInitialRoute('MainTabs');
-                } else {
-                    // Setup not complete or missing critical data - show setup flow
-                    setInitialRoute('SetupStep1');
-                }
-            } else {
-                // Not authenticated - go to Auth
-                setInitialRoute('Auth');
-            }
-        } catch (error) {
-            console.error('App state check error:', error);
-            setInitialRoute('Auth');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Navigation Theme based on context
+    // Navigation Theme
     const navTheme = {
         dark: isDark,
         colors: {
@@ -141,7 +86,8 @@ export default function AppNavigator() {
         },
     };
 
-    if (loading || initializing) {
+    // Show Loading only when initializing OR specifically loading auth data
+    if (initializing || loading) {
         return <LoadingScreen message="Starting Suntime..." />;
     }
 
@@ -149,7 +95,6 @@ export default function AppNavigator() {
         <View style={{ flex: 1, backgroundColor: colors.background }}>
             <NavigationContainer ref={navigationRef} theme={navTheme}>
                 <Stack.Navigator
-                    initialRouteName={initialRoute}
                     screenOptions={{
                         contentStyle: { backgroundColor: colors.background },
                         animation: 'slide_from_right',
@@ -159,38 +104,89 @@ export default function AppNavigator() {
                         headerTitleStyle: { fontWeight: 'bold' },
                     }}
                 >
-                    {/* UNIFIED AUTH SCREEN - Login/Register tabs */}
-                    <Stack.Screen
-                        name="Auth"
-                        component={AuthScreen}
-                        options={{ gestureEnabled: false }}
-                    />
+                    {!isAuthenticated ? (
+                        // ---------------------------------------------------------
+                        // AUTHENTICATION STACK
+                        // ---------------------------------------------------------
+                        <Stack.Screen
+                            name="Auth"
+                            component={AuthScreen}
+                            options={{ gestureEnabled: false }}
+                        />
+                    ) : !isSetupComplete ? (
+                        // ---------------------------------------------------------
+                        // SETUP WIZARD STACK
+                        // ---------------------------------------------------------
+                        <Stack.Group>
+                            <Stack.Screen
+                                name="SetupStep1"
+                                component={SetupStep1SkinType}
+                                options={{ gestureEnabled: false }}
+                            />
+                            <Stack.Screen
+                                name="SetupStep2"
+                                component={SetupStep2Sunscreen}
+                            />
+                            <Stack.Screen
+                                name="SetupStep3"
+                                component={SetupStep3Location}
+                            />
+                            <Stack.Screen
+                                name="SetupStepVitaminD"
+                                component={SetupStepVitaminD}
+                            />
+                            <Stack.Screen
+                                name="SetupStepPrescription"
+                                component={SetupStepPrescription}
+                            />
+                            <Stack.Screen
+                                name="SetupStep4"
+                                component={SetupStep4Disclaimer}
+                                options={{ gestureEnabled: false }}
+                            />
+                        </Stack.Group>
+                    ) : (
+                        // ---------------------------------------------------------
+                        // MAIN APP STACK
+                        // ---------------------------------------------------------
+                        <Stack.Group>
+                            <Stack.Screen
+                                name="MainTabs"
+                                component={TabNavigator}
+                            />
+                            <Stack.Screen
+                                name="History"
+                                component={HistoryScreen}
+                                options={{
+                                    headerShown: true,
+                                    headerTitle: 'History',
+                                    headerBackTitleVisible: false,
+                                }}
+                            />
+                            <Stack.Screen
+                                name="Settings"
+                                component={SettingsScreen}
+                                options={{
+                                    headerShown: true,
+                                    headerTitle: 'Settings',
+                                    headerBackTitleVisible: false,
+                                }}
+                            />
+                            <Stack.Screen
+                                name="ChangeSkinType"
+                                component={OnboardingScreen}
+                                options={{
+                                    presentation: 'modal',
+                                    headerShown: true,
+                                    headerTitle: 'Change Skin Type',
+                                }}
+                            />
+                        </Stack.Group>
+                    )}
 
-                    {/* SETUP WIZARD */}
-                    <Stack.Screen
-                        name="SetupStep1"
-                        component={SetupStep1SkinType}
-                        options={{ gestureEnabled: false }}
-                    />
-                    <Stack.Screen
-                        name="SetupStep2"
-                        component={SetupStep2Sunscreen}
-                    />
-                    <Stack.Screen
-                        name="SetupStep3"
-                        component={SetupStep3Location}
-                    />
-                    <Stack.Screen
-                        name="SetupStepVitaminD"
-                        component={SetupStepVitaminD}
-                    />
-                    <Stack.Screen
-                        name="SetupStep4"
-                        component={SetupStep4Disclaimer}
-                        options={{ gestureEnabled: false }}
-                    />
-
-                    {/* SKIN SCANNER - Camera based skin detection */}
+                    {/* ---------------------------------------------------------
+                        SHARED SCREENS (Accessible from Setup or Main)
+                        --------------------------------------------------------- */}
                     <Stack.Screen
                         name="SkinScanner"
                         component={SkinScannerScreen}
@@ -201,42 +197,6 @@ export default function AppNavigator() {
                         }}
                     />
 
-                    {/* MAIN APP - Daily Dashboard */}
-                    <Stack.Screen
-                        name="MainTabs"
-                        component={TabNavigator}
-                    />
-
-                    <Stack.Screen
-                        name="History"
-                        component={HistoryScreen}
-                        options={{
-                            headerShown: true,
-                            headerTitle: 'History',
-                            headerBackTitleVisible: false,
-                        }}
-                    />
-
-                    <Stack.Screen
-                        name="Settings"
-                        component={SettingsScreen}
-                        options={{
-                            headerShown: true,
-                            headerTitle: 'Settings',
-                            headerBackTitleVisible: false,
-                        }}
-                    />
-
-                    {/* Modal for changing skin type from Settings */}
-                    <Stack.Screen
-                        name="ChangeSkinType"
-                        component={OnboardingScreen}
-                        options={{
-                            presentation: 'modal',
-                            headerShown: true,
-                            headerTitle: 'Change Skin Type',
-                        }}
-                    />
                 </Stack.Navigator>
             </NavigationContainer>
         </View>

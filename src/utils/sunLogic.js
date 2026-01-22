@@ -58,12 +58,17 @@ export const getVitaminDStatus = (level) => {
  * Calculate safe sun exposure time - MAIN FUNCTION
  * Now accepts optional vitaminDAdjustment (in minutes)
  */
-export const calculateSafeTime = (uvIndex, skinType, isCloudy = false, hasSunscreen = false, vitaminDAdjustment = 0) => {
+export const calculateSafeTime = (uvIndex, skinType, isCloudy = false, hasSunscreen = false, vitaminDAdjustment = 0, isPhotosensitive = false) => {
     const baseTime = getBaseTime(uvIndex);
     const skinMultiplier = getSkinMultiplier(skinType);
     const environmentFactor = getEnvironmentFactor(isCloudy, hasSunscreen);
 
     let safeTime = baseTime * skinMultiplier * environmentFactor;
+
+    // Apply Photosensitivity Factor
+    if (isPhotosensitive) {
+        safeTime *= 0.5; // Reduce safe time by 50% for safety
+    }
 
     // Apply Vitamin D Adjustment
     // CRITICAL SAFETY RULE: If UV is HIGH (>7), IGNORE positive adjustments to prevent burning.

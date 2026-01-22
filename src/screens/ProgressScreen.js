@@ -161,6 +161,31 @@ export default function ProgressScreen() {
             );
             return await getDocs(q);
         } catch (e) {
+            // Fallback for missing index: Client-side sorting
+            if (e.code === 'failed-precondition' || e.message?.includes('index')) {
+                // console.log('⚠️ Index missing for Vitamin D. Using client-side fallback.');
+                try {
+                    const reportsRef = collection(db, 'vitaminDReports');
+                    // Query only by userId (no composite index needed)
+                    const qFallback = query(reportsRef, where('userId', '==', uid));
+                    const snapshot = await getDocs(qFallback);
+
+                    if (snapshot.empty) return { empty: true };
+
+                    // Convert to array and sort
+                    const docs = snapshot.docs.map(doc => ({ ...doc.data(), _id: doc.id }));
+                    docs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                    // Return structure matching QuerySnapshot
+                    return {
+                        empty: false,
+                        docs: [{ data: () => docs[0] }]
+                    };
+                } catch (fallbackError) {
+                    console.error('Fallback fetch error', fallbackError);
+                    return { empty: true };
+                }
+            }
             console.error('VitD fetch error', e);
             return { empty: true };
         }

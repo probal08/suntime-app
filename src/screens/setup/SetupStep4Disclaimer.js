@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
-import { AlertTriangle, Info, ShieldAlert, Heart, Activity } from 'lucide-react-native';
+import { AlertTriangle, Info, ShieldAlert, Heart, Activity, ArrowLeft } from 'lucide-react-native';
 import { completeSetup, saveDisclaimerAcceptance } from '../../utils/localStorage';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -38,9 +38,6 @@ export default function SetupStep4Disclaimer({ navigation }) {
             // Request Notification Permissions
             const { status } = await Notifications.requestPermissionsAsync();
 
-
-
-
             // Save disclaimer acceptance locally
             await saveDisclaimerAcceptance();
 
@@ -49,21 +46,14 @@ export default function SetupStep4Disclaimer({ navigation }) {
 
             // CRITICAL: Save setupCompleted: true to Firestore
             if (user) {
-                const result = await markSetupCompleted(user.uid);
-
+                await markSetupCompleted(user.uid);
 
                 // Refresh the auth context profile so navigation works correctly
                 await refreshProfile();
             }
 
-
-
-            // Navigate directly to main app
+            // Navigate directly to main app handles by AppNavigator state change
             setIsCompleting(false);
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs' }],
-            });
 
         } catch (error) {
             console.error('Error completing setup:', error);
@@ -78,12 +68,19 @@ export default function SetupStep4Disclaimer({ navigation }) {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={{ marginBottom: SPACING.md, alignSelf: 'flex-start' }}
+                >
+                    <ArrowLeft color={colors.text} size={24} />
+                </TouchableOpacity>
+
                 {/* Progress Indicator */}
                 <View style={styles.progressContainer}>
                     <View style={styles.progressBar}>
                         <View style={[styles.progressFill, { width: '100%' }]} />
                     </View>
-                    <Text style={styles.progressText}>Step 4 of 4</Text>
+                    <Text style={styles.progressText}>Step 6 of 6</Text>
                 </View>
 
                 {/* Header */}
@@ -271,12 +268,6 @@ const getStyles = (colors, isDark) => StyleSheet.create({
         color: colors.white,
         fontSize: moderateScale(18),
         fontWeight: 'bold',
-    },
-    acceptanceText: {
-        ...TYPOGRAPHY.body,
-        flex: 1,
-        fontWeight: '600',
-        color: colors.text,
     },
     acceptanceText: {
         ...TYPOGRAPHY.body,

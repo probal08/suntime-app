@@ -22,7 +22,8 @@ import {
     scheduleDailyNotification,
     cancelNotification,
     getScheduledNotifications,
-    scheduleSunExposureReminder
+    scheduleSunExposureReminder,
+    scheduleImmediateNotification
 } from '../services/notifications';
 import Animated, {
     FadeInDown,
@@ -53,7 +54,7 @@ import {
     clearActiveTimer,
     getSessionLogs
 } from '../utils/localStorage';
-import { calculateSafeTime, getUVCategory, calculateExposureScore } from '../utils/sunLogic';
+import { calculateSafeTime, getUVCategory, calculateExposureScore, getVitaminDStatus } from '../utils/sunLogic';
 import StandardButton from '../components/common/StandardButton';
 import SunTimer from '../components/SunTimer';
 import SessionCompleteOverlay from '../components/SessionCompleteOverlay';
@@ -80,6 +81,7 @@ export default function HomeScreen({ navigation }) {
     const [safeMinutes, setSafeMinutes] = useState(30);
     const [isManualData, setIsManualData] = useState(false); // Track if using manual override
     const [vitDAdjust, setVitDAdjust] = useState(0); // Vitamin D Adjustment minutes
+    const [isPhotosensitive, setIsPhotosensitive] = useState(false); // Medication factor
 
     // Daily Limit State
     const [dailyLimitReached, setDailyLimitReached] = useState(false);
@@ -288,13 +290,13 @@ export default function HomeScreen({ navigation }) {
 
     useEffect(() => {
         if (uvIndex !== null && skinType !== null) {
-            const newSafeTime = calculateSafeTime(uvIndex, skinType, isCloudy, hasSunscreen, vitDAdjust);
+            const newSafeTime = calculateSafeTime(uvIndex, skinType, isCloudy, hasSunscreen, vitDAdjust, isPhotosensitive);
             setSafeMinutes(newSafeTime);
             if (!hasStarted && !isActive) {
                 setTimeLeft(newSafeTime * 60);
             }
         }
-    }, [uvIndex, skinType, isCloudy, hasSunscreen, hasStarted, vitDAdjust]);
+    }, [uvIndex, skinType, isCloudy, hasSunscreen, hasStarted, vitDAdjust, isPhotosensitive]);
 
     useEffect(() => {
         if (isActive && endTimestamp) {
@@ -319,10 +321,18 @@ export default function HomeScreen({ navigation }) {
                 const userData = await fetchUserData(auth.currentUser.uid);
                 const today = new Date().toISOString().split('T')[0];
                 if (userData?.lastSessionDate === today) {
-
                     setDailyLimitReached(true);
                 } else {
                     setDailyLimitReached(false);
+                }
+
+                // Load Global Preferences (Meds & Vitamin D Baseline)
+                if (userData?.preferences) {
+                    if (userData.preferences.photosensitiveMeds === true) {
+                        setIsPhotosensitive(true);
+                    } else {
+                        setIsPhotosensitive(false);
+                    }
                 }
             }
 
@@ -356,14 +366,39 @@ export default function HomeScreen({ navigation }) {
                     const snapshot = await getDocs(q);
                     if (!snapshot.empty) {
                         const report = snapshot.docs[0].data();
-                        // Check if report is recent enough (e.g. within 6 months? Prompt says monthly tracking, assume valid indefinitely until replaced)
                         if (report.adjustment) {
                             vitaminDAdjustment = report.adjustment;
-
+                        }
+                    } else if (auth.currentUser) {
+                        // Fallback to Preferences Baseline if no report
+                        const userData = await fetchUserData(auth.currentUser.uid);
+                        if (userData?.preferences?.baselineVitaminD) {
+                            const baselineStatus = getVitaminDStatus(userData.preferences.baselineVitaminD);
+                            vitaminDAdjustment = baselineStatus.adjustment;
                         }
                     }
                 } catch (e) {
-                    console.log('Error fetching Vitamin D report:', e);
+                    // Fallback for missing index
+                    if (e.code === 'failed-precondition' || e.message?.includes('index')) {
+                        try {
+                            const { collection, query, where, getDocs } = require('firebase/firestore');
+                            const { db } = require('../config/firebase');
+                            const reportsRef = collection(db, 'vitaminDReports');
+                            const qFallback = query(reportsRef, where('userId', '==', auth.currentUser.uid));
+                            const snapshot = await getDocs(qFallback);
+                            if (!snapshot.empty) {
+                                const docs = snapshot.docs.map(doc => doc.data());
+                                docs.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                if (docs[0].adjustment) {
+                                    vitaminDAdjustment = docs[0].adjustment;
+                                }
+                            }
+                        } catch (fallbackError) {
+                            console.log('Vitamin D fallback failed', fallbackError);
+                        }
+                    } else {
+                        console.log('Error fetching Vitamin D report:', e);
+                    }
                 }
             }
 
@@ -646,11 +681,11 @@ export default function HomeScreen({ navigation }) {
                         <View style={styles.timerTextOverlay}>
                             {isSessionComplete || dailyLimitReached ? (
                                 <>
-                                    <Text style={[styles.timerTime, { fontSize: moderateScale(24), color: dailyLimitReached ? '#FF9800' : '#4CAF50' }]}>
-                                        {dailyLimitReached ? 'Daily Limit' : '✓ Complete'}
+                                    <Text style={[styles.timerTime, { fontSize: moderateScale(48), color: dailyLimitReached ? '#F44336' : '#4CAF50' }]}>
+                                        00:00
                                     </Text>
                                     <Text style={styles.timerLabel}>
-                                        {dailyLimitReached ? 'Come back tomorrow' : 'Session Finished'}
+                                        {dailyLimitReached ? 'Daily Limit Reached' : 'Session Finished'}
                                     </Text>
                                 </>
                             ) : timeLeft > 0 ? (

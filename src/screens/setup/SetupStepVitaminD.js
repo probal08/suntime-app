@@ -7,12 +7,13 @@ import {
     TextInput,
     Alert,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    TouchableOpacity
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, moderateScale, GLASS } from '../../constants/theme';
-import { Activity, HelpCircle } from 'lucide-react-native';
+import { Activity, HelpCircle, ArrowLeft } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { savePreferences } from '../../services/firestore';
@@ -51,12 +52,6 @@ export default function SetupStepVitaminD({ navigation }) {
         try {
             if (user && !isNaN(val)) {
                 // Save initial Vitamin D report
-                // We'll mimic the structure used in ProgressScreen/VitaminDUploadModal
-                // Note: Ideally we should use a consistent service method, but for now we'll save simple preference
-                // Actually, let's save to preferences to keep setup simple, 
-                // or rely on user doing a proper report later.
-                // For now, let's just save it as a "baseline" in user profile/preferences.
-
                 await savePreferences(user.uid, {
                     baselineVitaminD: val
                 });
@@ -66,7 +61,7 @@ export default function SetupStepVitaminD({ navigation }) {
             // Don't block flow on error
         }
 
-        navigation.navigate('SetupStep4');
+        navigation.navigate('SetupStepPrescription');
     };
 
     return (
@@ -80,12 +75,19 @@ export default function SetupStepVitaminD({ navigation }) {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={{ marginBottom: SPACING.md, alignSelf: 'flex-start' }}
+                    >
+                        <ArrowLeft color={colors.text} size={24} />
+                    </TouchableOpacity>
+
                     {/* Progress Indicator */}
                     <View style={styles.progressContainer}>
                         <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: '85%' }]} />
+                            <View style={[styles.progressFill, { width: '67%' }]} />
                         </View>
-                        <Text style={styles.progressText}>Step 3.5 of 4</Text>
+                        <Text style={styles.progressText}>Step 4 of 6</Text>
                     </View>
 
                     {/* Header */}

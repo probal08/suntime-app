@@ -12,7 +12,6 @@ import Animated, {
     Easing
 } from 'react-native-reanimated';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../constants/theme';
-import { Sun } from 'lucide-react-native';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
@@ -121,15 +120,7 @@ const SunTimer = ({ progress = 0, size = 200, isActive = false }) => {
                 <View style={[styles.borderRing, { width: size, height: size, borderRadius: radius }]} />
             </View>
 
-            {/* Sun Icon */}
-            <AnimatedView style={[styles.centerContent, sunStyle, glowStyle]}>
-                <Sun
-                    size={size * 0.35}
-                    color="#FFFFFF"
-                    fill={progress > 80 ? "#FFFFFF" : "rgba(255,255,255,0.3)"}
-                    strokeWidth={1.5}
-                />
-            </AnimatedView>
+            {/* Sun Icon Removed per user request */}
 
             {/* Completion Badge */}
             <AnimatedView style={[styles.completionContainer, completionStyle]}>

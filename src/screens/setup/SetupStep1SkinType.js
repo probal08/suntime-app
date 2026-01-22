@@ -107,9 +107,9 @@ export default function SetupStep1SkinType({ navigation }) {
                     {/* Progress Indicator */}
                     <View style={styles.progressContainer}>
                         <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: '25%' }]} />
+                            <View style={[styles.progressFill, { width: '17%' }]} />
                         </View>
-                        <Text style={styles.progressText}>Step 1 of 4</Text>
+                        <Text style={styles.progressText}>Step 1 of 6</Text>
                     </View>
 
                     {/* Header */}
