@@ -72,7 +72,7 @@ const SunTimer = ({ progress = 0, size = 200, isActive = false }) => {
 
     // Sun icon animation
     const sunStyle = useAnimatedStyle(() => {
-        const opacity = interpolate(fillHeight.value, [0, 30], [0.4, 1], Extrapolation.CLAMP);
+        const opacity = interpolate(fillHeight.value, [0, 30], [0, 0.8], Extrapolation.CLAMP);
         const scale = interpolate(fillHeight.value, [0, 100], [0.9, 1.15], Extrapolation.CLAMP);
         const rotate = `${rotateAnim.value}deg`;
 

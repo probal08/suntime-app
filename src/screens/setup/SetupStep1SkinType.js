@@ -32,7 +32,7 @@ const SKIN_TYPE_COLORS = {
 
 export default function SetupStep1SkinType({ navigation }) {
     const { colors, isDark } = useTheme();
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth();
     const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
     const [selectedType, setSelectedType] = useState(null);
     const [selectionMode, setSelectionMode] = useState(null); // 'camera' or 'manual'
@@ -50,9 +50,12 @@ export default function SetupStep1SkinType({ navigation }) {
                     // Also save to Firestore if user is logged in
                     if (user) {
                         await saveUserToFirestore(user.uid, { skinType: type });
+                        await refreshProfile();
                     }
 
-                    // Navigate directly to next setup step
+                    // Actually, we should get refreshProfile from useAuth() hook at top
+                    // and call it here.
+
                     navigation.navigate('SetupStep2');
                 } catch (error) {
                     console.error('Error saving skin type:', error);
@@ -82,6 +85,7 @@ export default function SetupStep1SkinType({ navigation }) {
             // Also save to Firestore if user is logged in
             if (user) {
                 await saveUserToFirestore(user.uid, { skinType: selectedType });
+                await refreshProfile();
             }
 
             // Navigate to next setup step

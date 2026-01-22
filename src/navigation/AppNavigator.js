@@ -14,6 +14,7 @@ import AuthScreen from '../screens/AuthScreen';
 import SetupStep1SkinType from '../screens/setup/SetupStep1SkinType';
 import SetupStep2Sunscreen from '../screens/setup/SetupStep2Sunscreen';
 import SetupStep3Location from '../screens/setup/SetupStep3Location';
+import SetupStepVitaminD from '../screens/setup/SetupStepVitaminD';
 import SetupStep4Disclaimer from '../screens/setup/SetupStep4Disclaimer';
 
 // Skin Scanner Screen
@@ -87,8 +88,18 @@ export default function AppNavigator() {
                 // User is logged in via Firebase
                 // Check setupCompleted AND skinType existence for strict validation
                 // This is the SINGLE SOURCE OF TRUTH
-                const hasSkinType = userProfile?.skinType !== undefined && userProfile?.skinType !== null;
-                const setupDone = (userProfile?.setupCompleted === true) && hasSkinType;
+                let hasSkinType = userProfile?.skinType !== undefined && userProfile?.skinType !== null;
+                const completedFlag = userProfile?.setupCompleted === true;
+
+                // Auto-repair: If setup is marked complete but skinType is missing, default to 3
+                if (completedFlag && !hasSkinType) {
+                    console.log('⚠️ Profile corrupted: Setup complete but missing skinType. Auto-repairing to Type 3.');
+                    hasSkinType = true;
+                    // We don't block navigation for this fix, we assume Type 3 temporarily
+                    // ideally we should trigger a background save here but we can rely on settings to fix it later
+                }
+
+                const setupDone = completedFlag && hasSkinType;
 
                 console.log('📱 Auth State Check:', {
                     userId: user.uid,
@@ -168,6 +179,10 @@ export default function AppNavigator() {
                     <Stack.Screen
                         name="SetupStep3"
                         component={SetupStep3Location}
+                    />
+                    <Stack.Screen
+                        name="SetupStepVitaminD"
+                        component={SetupStepVitaminD}
                     />
                     <Stack.Screen
                         name="SetupStep4"

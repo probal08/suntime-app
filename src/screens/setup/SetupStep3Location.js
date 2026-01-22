@@ -102,7 +102,7 @@ export default function SetupStep3Location({ navigation }) {
         }
 
         // Continue to next step
-        navigation.navigate('SetupStep4');
+        navigation.navigate('SetupStepVitaminD');
     };
 
     const canContinue = () => {
